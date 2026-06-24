@@ -1,6 +1,8 @@
 *.iml
 .gradle
 /local.properties
+/.idea/*
+!/.idea/vcs.xml
 /.idea/caches
 /.idea/libraries
 /.idea/modules.xml
@@ -13,3 +15,22 @@
 .externalNativeBuild
 .cxx
 local.properties
+
+# Android build artifacts
+*.apk
+*.ap_
+*.aab
+*.dex
+*.class
+*.hprof
+
+# Kotlin/Java build outputs
+out/
+
+# Generated local files
+captures/
+*.log
+
+# Keystores and signing files
+*.jks
+*.keystore
