@@ -1,4 +1,4 @@
-package com.kliuchko.archive17.data.remote
+package com.kliuchko.archive17.data.networking
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull

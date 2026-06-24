@@ -1,9 +1,9 @@
-package com.kliuchko.archive17.data.remote.mapper
+package com.kliuchko.archive17.data.networking.mapper
 
 import com.google.gson.JsonElement
-import com.kliuchko.archive17.data.remote.dto.OpenLibrarySearchDocDto
-import com.kliuchko.archive17.data.remote.dto.OpenLibrarySearchResponseDto
-import com.kliuchko.archive17.data.remote.dto.OpenLibraryWorkDto
+import com.kliuchko.archive17.data.networking.dto.OpenLibrarySearchDocDto
+import com.kliuchko.archive17.data.networking.dto.OpenLibrarySearchResponseDto
+import com.kliuchko.archive17.data.networking.dto.OpenLibraryWorkDto
 import com.kliuchko.archive17.domain.model.Work
 
 fun OpenLibrarySearchResponseDto.toDomain(): List<Work> = docs.mapNotNull { it.toDomain() }

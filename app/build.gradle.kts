@@ -42,6 +42,10 @@ android {
     }
 }
 
+ksp {
+    arg("room.schemaLocation", "$projectDir/schemas")
+}
+
 dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
@@ -58,6 +62,7 @@ dependencies {
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.retrofit)
     implementation(libs.retrofit.converter.gson)
+    implementation(libs.gson)
     implementation(libs.okhttp.logging.interceptor)
     implementation(libs.androidx.room.runtime)
     implementation(libs.androidx.room.ktx)

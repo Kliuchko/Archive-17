@@ -1,9 +1,9 @@
-package com.kliuchko.archive17.data.remote.mapper
+package com.kliuchko.archive17.data.networking.mapper
 
 import com.google.gson.JsonParser
-import com.kliuchko.archive17.data.remote.dto.OpenLibrarySearchDocDto
-import com.kliuchko.archive17.data.remote.dto.OpenLibrarySearchResponseDto
-import com.kliuchko.archive17.data.remote.dto.OpenLibraryWorkDto
+import com.kliuchko.archive17.data.networking.dto.OpenLibrarySearchDocDto
+import com.kliuchko.archive17.data.networking.dto.OpenLibrarySearchResponseDto
+import com.kliuchko.archive17.data.networking.dto.OpenLibraryWorkDto
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test

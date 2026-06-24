@@ -1,7 +1,7 @@
-package com.kliuchko.archive17.data.remote.api
+package com.kliuchko.archive17.data.networking.api
 
-import com.kliuchko.archive17.data.remote.dto.OpenLibrarySearchResponseDto
-import com.kliuchko.archive17.data.remote.dto.OpenLibraryWorkDto
+import com.kliuchko.archive17.data.networking.dto.OpenLibrarySearchResponseDto
+import com.kliuchko.archive17.data.networking.dto.OpenLibraryWorkDto
 import retrofit2.http.GET
 import retrofit2.http.Path
 import retrofit2.http.Query

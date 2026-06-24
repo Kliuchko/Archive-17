@@ -1,4 +1,4 @@
-package com.kliuchko.archive17.data.remote
+package com.kliuchko.archive17.data.networking
 
 object CoverUrlBuilder {
     private const val BASE_URL = "https://covers.openlibrary.org/b/id"

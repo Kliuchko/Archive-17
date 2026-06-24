@@ -1,11 +1,12 @@
-# Shelfmark
+# Archive 17
 
-Shelfmark is a native Android application for discovering books with Open Library and managing a local personal library.
+Archive 17 is a native Android application for discovering books with Open Library and managing a local personal library.
 
 Current progress:
 
 - Stage 0 project foundation is in place.
 - Domain models and the initial Open Library remote API contracts are in place.
+- Room entities, DAO contracts, type converters, and schema export are in place.
 
 ## Tech Stack
 

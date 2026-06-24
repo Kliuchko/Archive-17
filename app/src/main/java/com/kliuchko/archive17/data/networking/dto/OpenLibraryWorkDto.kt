@@ -1,4 +1,4 @@
-package com.kliuchko.archive17.data.remote.dto
+package com.kliuchko.archive17.data.networking.dto
 
 import com.google.gson.JsonElement
 import com.google.gson.annotations.SerializedName
