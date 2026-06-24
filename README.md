@@ -2,7 +2,10 @@
 
 Shelfmark is a native Android application for discovering books with Open Library and managing a local personal library.
 
-This repository is currently at stage 0: project dependencies, base structure, ignore rules, and a README draft are in place. Functional implementation will be added in later stages.
+Current progress:
+
+- Stage 0 project foundation is in place.
+- Domain models and the initial Open Library remote API contracts are in place.
 
 ## Tech Stack
 
@@ -24,7 +27,7 @@ The codebase is organized around a small clean-architecture style split:
 - `data/remote` contains Open Library API definitions and DTOs.
 - `data/local` contains Room database, DAO, and entity definitions.
 - `data/repository` coordinates remote and local data sources and owns cache behavior.
-- `ui` contains feature screens and ViewModels for search, book details, and the personal library.
+- `presentation` contains feature screens, ViewModels, and theme code.
 - `navigation` contains app destinations and navigation graph setup.
 - `di` contains Koin modules.
 - `core` contains shared utilities, result types, and common app infrastructure.
