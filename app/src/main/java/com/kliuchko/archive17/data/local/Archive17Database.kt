@@ -24,4 +24,8 @@ abstract class Archive17Database : RoomDatabase() {
     abstract fun workDao(): WorkDao
     abstract fun editionDao(): EditionDao
     abstract fun libraryEntryDao(): LibraryEntryDao
+
+    companion object {
+        const val DATABASE_NAME = "archive17.db"
+    }
 }

@@ -9,6 +9,7 @@ Current progress:
 - Room entities, DAO contracts, type converters, and schema export are in place.
 - Repository contracts and cache-first data coordination are in place.
 - Navigation routes and placeholder screens are in place.
+- Search is wired to the repository with debounce, loading, empty, and error states.
 
 ## Tech Stack
 
