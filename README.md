@@ -2,16 +2,13 @@
 
 Archive 17 is a native Android application for discovering books with Open Library and managing a local personal library.
 
-Current progress:
+## Features
 
-- Stage 0 project foundation is in place.
-- Domain models and the initial Open Library remote API contracts are in place.
-- Room entities, DAO contracts, type converters, and schema export are in place.
-- Repository contracts and cache-first data coordination are in place.
-- Navigation routes and placeholder screens are in place.
-- Search is wired to the repository with debounce, loading, empty, and error states.
-- Book details are wired to cached Room data, background refresh, and reading status updates.
-- My library reads saved books from Room and filters them by reading status.
+- Search books by title or author after at least two characters.
+- Debounced Open Library search with loading, empty, and error states.
+- Book details with cached data, background refresh, language metadata, subjects, and reading status.
+- Personal library stored in Room and available offline.
+- Library filtering by reading status: Want to read, Reading, and Finished.
 
 ## Tech Stack
 
@@ -19,49 +16,48 @@ Current progress:
 - Jetpack Compose and Material 3
 - MVVM
 - Navigation Compose
-- Retrofit and OkHttp
+- Retrofit, OkHttp, and Gson
 - Room
 - Coil
 - Coroutines, Flow, and StateFlow
 - Koin
 
-## Architecture Draft
+## Architecture
 
-The codebase is organized around a small clean-architecture style split:
+The codebase uses a small clean-architecture style split:
 
-- `domain` contains app models, repository contracts, and use cases.
-- `data/remote` contains Open Library API definitions and DTOs.
-- `data/local` contains Room database, DAO, and entity definitions.
+- `domain` contains app models and repository contracts.
+- `data/networking` contains Open Library API definitions, DTOs, and DTO-to-domain mapping.
+- `data/local` contains Room database, DAO, entities, relations, type converters, and local mapping.
 - `data/repository` coordinates remote and local data sources and owns cache behavior.
-- `presentation` contains feature screens, ViewModels, and theme code.
-- `navigation` contains app destinations and navigation graph setup.
+- `presentation` contains Compose screens, ViewModels, navigation, and theme code.
 - `di` contains Koin modules.
-- `core` contains shared utilities, result types, and common app infrastructure.
+- `core` contains shared infrastructure such as time providers.
 
-The core domain concepts from the exercise are:
+Core domain concepts:
 
 - `Work`: the abstract book concept.
 - `Edition`: a specific version of a book, including language metadata.
-- `LibraryEntry`: the user's local relationship with a saved book.
-- `ReadingStatus`: `Want to read`, `Reading`, or `Finished`.
+- `LibraryEntry`: the user's locally saved relationship with a work.
+- `ReadingStatus`: Want to read, Reading, or Finished.
 
 ## API Source
 
 The app uses Open Library:
 
 - `GET /search.json` for book search by title or author.
-- `GET /works/{workId}.json` for book details, descriptions, and subjects.
+- `GET /works/{workId}.json` for additional details, descriptions, and subjects.
 - Open Library Covers API for cover image URLs based on cover identifiers.
 
-## Cache Strategy Draft
+## Cache Strategy
 
 - Room is the local source of truth for saved books and cached details.
-- Saved books should render immediately from local storage.
-- Previously opened details should be available offline from cache.
-- When the network is available, cached details should refresh in the background.
-- Failed refreshes should keep showing cached content with a cached/offline indicator.
-- Cached records will include `lastUpdatedAt`.
-- The first version will use a 24-hour freshness policy.
+- Search results are cached as `Work` records so details can open immediately from local data.
+- Details screens observe Room first, then refresh Open Library details in the background.
+- If refresh fails and cached data exists, the cached content stays visible with a cached/stale indicator.
+- If no cached data exists and refresh fails, the details screen shows an error state.
+- Cached records include `lastUpdatedAt`.
+- The first version uses a 24-hour freshness policy.
 
 ## Build
 
@@ -82,8 +78,8 @@ Run tests:
 ./gradlew test
 ```
 
-## Planned Screens
+## Known Limitations
 
-- Search
-- Book details
-- My library
+- The app does not implement an e-book reader, file downloads, authentication, reading progress, bookmarks, or annotations.
+- Edition language metadata is based on the search endpoint's language field in this version.
+- The UI is intentionally functional and restrained; final visual polish can happen after core behavior review.

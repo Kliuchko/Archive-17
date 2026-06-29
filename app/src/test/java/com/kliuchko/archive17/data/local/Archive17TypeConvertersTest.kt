@@ -4,7 +4,7 @@ import com.kliuchko.archive17.domain.model.ReadingStatus
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
-class ShelfmarkTypeConvertersTest {
+class Archive17TypeConvertersTest {
     private val converters = Archive17TypeConverters()
 
     @Test

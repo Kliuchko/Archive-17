@@ -1,6 +1,7 @@
 package com.kliuchko.archive17.di
 
 import androidx.room.Room
+import com.kliuchko.archive17.BuildConfig
 import com.kliuchko.archive17.core.time.SystemTimeProvider
 import com.kliuchko.archive17.core.time.TimeProvider
 import com.kliuchko.archive17.data.local.Archive17Database
@@ -35,7 +36,11 @@ val appModule = module {
 
     single {
         HttpLoggingInterceptor().apply {
-            level = HttpLoggingInterceptor.Level.BASIC
+            level = if (BuildConfig.DEBUG) {
+                HttpLoggingInterceptor.Level.BASIC
+            } else {
+                HttpLoggingInterceptor.Level.NONE
+            }
         }
     }
 
