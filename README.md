@@ -8,6 +8,7 @@ Current progress:
 - Domain models and the initial Open Library remote API contracts are in place.
 - Room entities, DAO contracts, type converters, and schema export are in place.
 - Repository contracts and cache-first data coordination are in place.
+- Navigation routes and placeholder screens are in place.
 
 ## Tech Stack
 
