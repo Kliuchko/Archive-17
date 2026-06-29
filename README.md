@@ -10,6 +10,7 @@ Current progress:
 - Repository contracts and cache-first data coordination are in place.
 - Navigation routes and placeholder screens are in place.
 - Search is wired to the repository with debounce, loading, empty, and error states.
+- Book details are wired to cached Room data, background refresh, and reading status updates.
 
 ## Tech Stack
 
