@@ -11,6 +11,7 @@ Current progress:
 - Navigation routes and placeholder screens are in place.
 - Search is wired to the repository with debounce, loading, empty, and error states.
 - Book details are wired to cached Room data, background refresh, and reading status updates.
+- My library reads saved books from Room and filters them by reading status.
 
 ## Tech Stack
 

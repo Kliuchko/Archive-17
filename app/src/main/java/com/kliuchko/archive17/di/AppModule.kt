@@ -8,6 +8,7 @@ import com.kliuchko.archive17.data.networking.api.OpenLibraryApi
 import com.kliuchko.archive17.data.repository.DefaultBookRepository
 import com.kliuchko.archive17.domain.repository.BookRepository
 import com.kliuchko.archive17.presentation.details.BookDetailsViewModel
+import com.kliuchko.archive17.presentation.library.LibraryViewModel
 import com.kliuchko.archive17.presentation.search.SearchViewModel
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
@@ -74,5 +75,9 @@ val appModule = module {
             workId = parameters.get(),
             repository = get(),
         )
+    }
+
+    viewModel {
+        LibraryViewModel(repository = get())
     }
 }
