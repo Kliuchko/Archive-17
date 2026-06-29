@@ -3,7 +3,9 @@ package com.kliuchko.archive17.data.local.mapper
 import com.kliuchko.archive17.data.local.entity.EditionEntity
 import com.kliuchko.archive17.data.local.entity.LibraryEntryEntity
 import com.kliuchko.archive17.data.local.entity.WorkEntity
+import com.kliuchko.archive17.data.local.relation.LibraryEntryWithWorkEntity
 import com.kliuchko.archive17.domain.model.Edition
+import com.kliuchko.archive17.domain.model.LibraryBook
 import com.kliuchko.archive17.domain.model.LibraryEntry
 import com.kliuchko.archive17.domain.model.Work
 
@@ -65,6 +67,12 @@ fun LibraryEntryEntity.toDomain(): LibraryEntry =
         readingStatus = readingStatus,
         savedAt = savedAt,
         updatedAt = updatedAt,
+    )
+
+fun LibraryEntryWithWorkEntity.toDomain(): LibraryBook =
+    LibraryBook(
+        work = work.toDomain(),
+        entry = entry.toDomain(),
     )
 
 private fun buildEditionId(

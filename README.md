@@ -7,6 +7,7 @@ Current progress:
 - Stage 0 project foundation is in place.
 - Domain models and the initial Open Library remote API contracts are in place.
 - Room entities, DAO contracts, type converters, and schema export are in place.
+- Repository contracts and cache-first data coordination are in place.
 
 ## Tech Stack
 

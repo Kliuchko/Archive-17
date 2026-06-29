@@ -3,6 +3,7 @@ package com.kliuchko.archive17.data.local.mapper
 import com.kliuchko.archive17.data.local.entity.EditionEntity
 import com.kliuchko.archive17.data.local.entity.LibraryEntryEntity
 import com.kliuchko.archive17.data.local.entity.WorkEntity
+import com.kliuchko.archive17.data.local.relation.LibraryEntryWithWorkEntity
 import com.kliuchko.archive17.domain.model.Edition
 import com.kliuchko.archive17.domain.model.LibraryEntry
 import com.kliuchko.archive17.domain.model.ReadingStatus
@@ -99,5 +100,34 @@ class LocalMapperTest {
         ).toDomain()
 
         assertEquals(entry, mappedBack)
+    }
+
+    @Test
+    fun `maps library entry with work relation`() {
+        val relation = LibraryEntryWithWorkEntity(
+            entry = LibraryEntryEntity(
+                workId = "OL45883W",
+                readingStatus = ReadingStatus.FINISHED,
+                savedAt = 100L,
+                updatedAt = 200L,
+            ),
+            work = WorkEntity(
+                id = "OL45883W",
+                title = "Pride and Prejudice",
+                authors = listOf("Jane Austen"),
+                coverId = 12645118,
+                firstPublishYear = 1813,
+                editionCount = 428,
+                editionLanguages = listOf("eng"),
+                description = null,
+                subjects = emptyList(),
+                lastUpdatedAt = 300L,
+            ),
+        )
+
+        val libraryBook = relation.toDomain()
+
+        assertEquals("OL45883W", libraryBook.work.id)
+        assertEquals(ReadingStatus.FINISHED, libraryBook.entry.readingStatus)
     }
 }
