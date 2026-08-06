@@ -31,6 +31,8 @@ import coil.compose.AsyncImage
 import com.kliuchko.archive17.data.networking.CoverSize
 import com.kliuchko.archive17.data.networking.CoverUrlBuilder
 import com.kliuchko.archive17.domain.model.Work
+import com.kliuchko.archive17.domain.model.LocalBook
+import java.io.File
 
 @Composable
 fun ArchiveMark(
@@ -141,6 +143,35 @@ fun BookCover(
         AsyncImage(
             model = coverUrl,
             contentDescription = work.title,
+            modifier = modifier
+                .size(width = width, height = height)
+                .clip(shape)
+                .background(MaterialTheme.colorScheme.tertiary),
+            contentScale = ContentScale.Crop,
+        )
+    }
+}
+
+@Composable
+fun LocalBookCover(
+    book: LocalBook,
+    modifier: Modifier = Modifier,
+    width: Dp = 58.dp,
+    height: Dp = 86.dp,
+) {
+    val coverPath = book.coverPath
+    if (coverPath == null) {
+        GeneratedCover(
+            title = book.title,
+            modifier = modifier,
+            width = width,
+            height = height,
+        )
+    } else {
+        val shape = RoundedCornerShape(topStart = 5.dp, topEnd = 9.dp, bottomEnd = 9.dp, bottomStart = 5.dp)
+        AsyncImage(
+            model = File(coverPath),
+            contentDescription = book.title,
             modifier = modifier
                 .size(width = width, height = height)
                 .clip(shape)

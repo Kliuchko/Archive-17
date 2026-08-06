@@ -2,6 +2,7 @@ package com.kliuchko.archive17.presentation.library
 
 import com.kliuchko.archive17.domain.model.LibraryBook
 import com.kliuchko.archive17.domain.model.LibraryEntry
+import com.kliuchko.archive17.domain.model.LocalBook
 import com.kliuchko.archive17.domain.model.ReadingStatus
 import com.kliuchko.archive17.domain.model.Work
 import org.junit.Assert.assertEquals
@@ -56,6 +57,18 @@ class LibraryUiStateTest {
         assertFalse(state.isEmpty)
     }
 
+    @Test
+    fun `counts local and catalog books on one shelf`() {
+        val state = LibraryUiState(
+            isLoading = false,
+            books = listOf(sampleLibraryBook()),
+            localBooks = listOf(sampleLocalBook()),
+        )
+
+        assertEquals(2, state.bookCount)
+        assertFalse(state.isEmpty)
+    }
+
     private fun sampleLibraryBook(): LibraryBook =
         LibraryBook(
             work = Work(
@@ -77,4 +90,17 @@ class LibraryUiStateTest {
                 updatedAt = 200L,
             ),
         )
+
+    private fun sampleLocalBook(): LocalBook = LocalBook(
+        id = "local-1",
+        title = "Local book",
+        author = "Author",
+        identifier = null,
+        filePath = "/books/local-1.epub",
+        coverPath = null,
+        progressionJson = null,
+        readingStatus = ReadingStatus.WANT_TO_READ,
+        addedAt = 100L,
+        updatedAt = 100L,
+    )
 }

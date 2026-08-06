@@ -10,6 +10,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
@@ -24,6 +25,7 @@ import com.kliuchko.archive17.presentation.details.BookDetailsScreen
 import com.kliuchko.archive17.presentation.home.HomeScreen
 import com.kliuchko.archive17.presentation.library.LibraryScreen
 import com.kliuchko.archive17.presentation.profile.ProfileScreen
+import com.kliuchko.archive17.presentation.reader.EpubReaderActivity
 import com.kliuchko.archive17.presentation.search.SearchScreen
 
 private data class TopLevelDestination(
@@ -44,6 +46,7 @@ fun Archive17App(
     modifier: Modifier = Modifier,
     navController: NavHostController = rememberNavController(),
 ) {
+    val context = LocalContext.current
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route
     val showBottomBar = topLevelDestinations.any { it.destination.route == currentRoute }
@@ -123,6 +126,9 @@ fun Archive17App(
                         navController.navigate(Archive17Destination.Search.route) {
                             launchSingleTop = true
                         }
+                    },
+                    onLocalBookClick = { bookId ->
+                        context.startActivity(EpubReaderActivity.createIntent(context, bookId))
                     },
                 )
             }

@@ -1,5 +1,7 @@
 package com.kliuchko.archive17.presentation.library
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -7,6 +9,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -17,46 +20,75 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.kliuchko.archive17.domain.model.LibraryBook
+import com.kliuchko.archive17.domain.model.LocalBook
 import com.kliuchko.archive17.presentation.components.ArchiveBrand
 import com.kliuchko.archive17.presentation.components.BookCover
+import com.kliuchko.archive17.presentation.components.LocalBookCover
 import com.kliuchko.archive17.presentation.details.displayName
 import org.koin.androidx.compose.koinViewModel
 
 @Composable
 fun LibraryScreen(
     onBookClick: (String) -> Unit,
+    onLocalBookClick: (String) -> Unit,
     onCatalogClick: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: LibraryViewModel = koinViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val snackbarHostState = remember { SnackbarHostState() }
+    val filePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        uri?.let { viewModel.onFileSelected(it.toString()) }
+    }
+    val openFilePicker = {
+        filePicker.launch(arrayOf("application/epub+zip", "application/octet-stream"))
+    }
 
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .padding(horizontal = 20.dp, vertical = 18.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp),
-    ) {
+    LaunchedEffect(uiState.message) {
+        uiState.message?.let {
+            snackbarHostState.showSnackbar(it)
+            viewModel.onMessageShown()
+        }
+    }
+
+    Box(modifier = modifier.fillMaxSize()) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 20.dp, vertical = 18.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
         ArchiveBrand()
-        Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
-            Text(
-                text = "Полка",
-                style = MaterialTheme.typography.headlineMedium,
-            )
-            Text(
-                text = shelfSubtitle(uiState.books.size),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                Text(text = "Полка", style = MaterialTheme.typography.headlineMedium)
+                Text(
+                    text = shelfSubtitle(uiState.bookCount),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            TextButton(onClick = openFilePicker, enabled = !uiState.isImporting) {
+                Text(if (uiState.isImporting) "Добавляем…" else "+ EPUB")
+            }
         }
 
         androidx.compose.foundation.lazy.LazyRow(
@@ -86,6 +118,8 @@ fun LibraryScreen(
                     EmptyShelf(
                         selectedFilter = uiState.selectedFilter,
                         onCatalogClick = onCatalogClick,
+                        onImportClick = openFilePicker,
+                        isImporting = uiState.isImporting,
                         modifier = Modifier.fillMaxSize(),
                     )
                 }
@@ -99,6 +133,15 @@ fun LibraryScreen(
                         verticalArrangement = Arrangement.spacedBy(18.dp),
                     ) {
                         items(
+                            items = uiState.localBooks,
+                            key = { "local-${it.id}" },
+                        ) { book ->
+                            ShelfLocalBook(
+                                book = book,
+                                onClick = { onLocalBookClick(book.id) },
+                            )
+                        }
+                        items(
                             items = uiState.books,
                             key = { it.work.id },
                         ) { book ->
@@ -111,6 +154,13 @@ fun LibraryScreen(
                 }
             }
         }
+        }
+        SnackbarHost(
+            hostState = snackbarHostState,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(16.dp),
+        )
     }
 }
 
@@ -145,9 +195,41 @@ private fun ShelfBook(
 }
 
 @Composable
+private fun ShelfLocalBook(
+    book: LocalBook,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier.clickable(onClick = onClick),
+        verticalArrangement = Arrangement.spacedBy(7.dp),
+    ) {
+        LocalBookCover(
+            book = book,
+            modifier = Modifier.align(Alignment.CenterHorizontally),
+            width = 94.dp,
+            height = 138.dp,
+        )
+        Text(
+            text = book.title,
+            style = MaterialTheme.typography.titleMedium,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+        )
+        Text(
+            text = book.readingStatus.displayName(),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.primary,
+        )
+    }
+}
+
+@Composable
 private fun EmptyShelf(
     selectedFilter: LibraryFilter,
     onCatalogClick: () -> Unit,
+    onImportClick: () -> Unit,
+    isImporting: Boolean,
     modifier: Modifier = Modifier,
 ) {
     Box(
@@ -155,9 +237,7 @@ private fun EmptyShelf(
         contentAlignment = Alignment.Center,
     ) {
         Card(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clickable(onClick = onCatalogClick),
+            modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(18.dp),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         ) {
@@ -171,7 +251,7 @@ private fun EmptyShelf(
                 )
                 Text(
                     text = if (selectedFilter == LibraryFilter.ALL) {
-                        "Найдите книгу в каталоге. Добавление EPUB из файлов появится следующим этапом."
+                        "Найдите книгу в каталоге или добавьте свой EPUB с устройства."
                     } else {
                         "Измените статус книги или выберите другой раздел."
                     },
@@ -181,13 +261,17 @@ private fun EmptyShelf(
                 if (selectedFilter == LibraryFilter.ALL) {
                     Text(
                         text = "Открыть каталог →",
-                        modifier = Modifier.padding(top = 5.dp),
+                        modifier = Modifier
+                            .padding(top = 5.dp)
+                            .clickable(onClick = onCatalogClick),
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.primary,
                     )
                     Text(
-                        text = "ДОБАВИТЬ ИЗ ФАЙЛА · СКОРО",
-                        modifier = Modifier.padding(top = 8.dp),
+                        text = if (isImporting) "ДОБАВЛЯЕМ…" else "ДОБАВИТЬ EPUB ИЗ ФАЙЛА →",
+                        modifier = Modifier
+                            .padding(top = 8.dp)
+                            .clickable(enabled = !isImporting, onClick = onImportClick),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.primary,
                     )

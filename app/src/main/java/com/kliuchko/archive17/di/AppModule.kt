@@ -7,7 +7,10 @@ import com.kliuchko.archive17.core.time.TimeProvider
 import com.kliuchko.archive17.data.local.Archive17Database
 import com.kliuchko.archive17.data.networking.api.OpenLibraryApi
 import com.kliuchko.archive17.data.repository.DefaultBookRepository
+import com.kliuchko.archive17.data.reader.ReadiumService
+import com.kliuchko.archive17.data.repository.DefaultLocalBookRepository
 import com.kliuchko.archive17.domain.repository.BookRepository
+import com.kliuchko.archive17.domain.repository.LocalBookRepository
 import com.kliuchko.archive17.presentation.details.BookDetailsViewModel
 import com.kliuchko.archive17.presentation.library.LibraryViewModel
 import com.kliuchko.archive17.presentation.search.SearchViewModel
@@ -27,12 +30,16 @@ val appModule = module {
             androidContext(),
             Archive17Database::class.java,
             Archive17Database.DATABASE_NAME,
-        ).build()
+        )
+            .addMigrations(Archive17Database.MIGRATION_1_2)
+            .build()
     }
 
     single { get<Archive17Database>().workDao() }
     single { get<Archive17Database>().editionDao() }
     single { get<Archive17Database>().libraryEntryDao() }
+    single { get<Archive17Database>().localBookDao() }
+    single { ReadiumService(androidContext()) }
 
     single {
         HttpLoggingInterceptor().apply {
@@ -71,6 +78,15 @@ val appModule = module {
         )
     }
 
+    single<LocalBookRepository> {
+        DefaultLocalBookRepository(
+            context = androidContext(),
+            localBookDao = get(),
+            readiumService = get(),
+            timeProvider = get(),
+        )
+    }
+
     viewModel {
         SearchViewModel(repository = get())
     }
@@ -83,6 +99,9 @@ val appModule = module {
     }
 
     viewModel {
-        LibraryViewModel(repository = get())
+        LibraryViewModel(
+            repository = get(),
+            localBookRepository = get(),
+        )
     }
 }

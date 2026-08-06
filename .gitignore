@@ -31,6 +31,9 @@ out/
 captures/
 *.log
 
+# Local product notes
+PRODUCT_DIRECTION.md
+
 # Keystores and signing files
 *.jks
 *.keystore
