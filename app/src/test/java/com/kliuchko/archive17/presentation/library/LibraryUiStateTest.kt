@@ -20,10 +20,10 @@ class LibraryUiStateTest {
 
     @Test
     fun `maps filter labels`() {
-        assertEquals("All", LibraryFilter.ALL.displayName())
-        assertEquals("Want to read", LibraryFilter.WANT_TO_READ.displayName())
-        assertEquals("Reading", LibraryFilter.READING.displayName())
-        assertEquals("Finished", LibraryFilter.FINISHED.displayName())
+        assertEquals("Все", LibraryFilter.ALL.displayName())
+        assertEquals("Отложено", LibraryFilter.WANT_TO_READ.displayName())
+        assertEquals("Читаю", LibraryFilter.READING.displayName())
+        assertEquals("Прочитано", LibraryFilter.FINISHED.displayName())
     }
 
     @Test

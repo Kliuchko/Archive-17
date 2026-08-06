@@ -13,4 +13,4 @@ enum class LibraryFilter(
 }
 
 fun LibraryFilter.displayName(): String =
-    readingStatus?.displayName() ?: "All"
+    readingStatus?.displayName() ?: "Все"

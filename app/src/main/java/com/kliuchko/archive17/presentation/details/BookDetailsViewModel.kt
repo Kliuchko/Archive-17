@@ -85,7 +85,7 @@ class BookDetailsViewModel(
                         it.copy(
                             isRefreshing = false,
                             selectedStatus = result.data.entry.readingStatus,
-                            message = "Saved as ${result.data.entry.readingStatus.displayName()}.",
+                            message = "Книга сохранена: ${result.data.entry.readingStatus.displayName()}.",
                         )
                     }
                 }

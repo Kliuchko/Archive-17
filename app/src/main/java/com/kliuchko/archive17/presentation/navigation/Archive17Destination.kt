@@ -3,12 +3,20 @@ package com.kliuchko.archive17.presentation.navigation
 sealed interface Archive17Destination {
     val route: String
 
+    data object Home : Archive17Destination {
+        override val route = "home"
+    }
+
     data object Search : Archive17Destination {
         override val route = "search"
     }
 
     data object Library : Archive17Destination {
         override val route = "library"
+    }
+
+    data object Profile : Archive17Destination {
+        override val route = "profile"
     }
 
     data object Details : Archive17Destination {

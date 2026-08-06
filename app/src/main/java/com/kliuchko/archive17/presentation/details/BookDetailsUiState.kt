@@ -22,12 +22,12 @@ data class BookDetailsUiState(
             .orEmpty()
             .takeIf { it.isNotEmpty() }
             ?.joinToString()
-            ?: "Not specified"
+            ?: "Не указан"
 }
 
 fun ReadingStatus.displayName(): String =
     when (this) {
-        ReadingStatus.WANT_TO_READ -> "Want to read"
-        ReadingStatus.READING -> "Reading"
-        ReadingStatus.FINISHED -> "Finished"
+        ReadingStatus.WANT_TO_READ -> "Отложено"
+        ReadingStatus.READING -> "Читаю"
+        ReadingStatus.FINISHED -> "Прочитано"
     }

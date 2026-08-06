@@ -15,7 +15,7 @@ class BookDetailsUiStateTest {
             work = sampleWork(editionLanguages = emptyList()),
         )
 
-        assertEquals("Not specified", state.languageLabel)
+        assertEquals("Не указан", state.languageLabel)
     }
 
     @Test
@@ -52,9 +52,9 @@ class BookDetailsUiStateTest {
 
     @Test
     fun `maps reading status labels`() {
-        assertEquals("Want to read", ReadingStatus.WANT_TO_READ.displayName())
-        assertEquals("Reading", ReadingStatus.READING.displayName())
-        assertEquals("Finished", ReadingStatus.FINISHED.displayName())
+        assertEquals("Отложено", ReadingStatus.WANT_TO_READ.displayName())
+        assertEquals("Читаю", ReadingStatus.READING.displayName())
+        assertEquals("Прочитано", ReadingStatus.FINISHED.displayName())
     }
 
     private fun sampleWork(

@@ -1,18 +1,14 @@
 package com.kliuchko.archive17.presentation.search
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -20,78 +16,62 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import coil.compose.AsyncImage
-import com.kliuchko.archive17.data.networking.CoverSize
-import com.kliuchko.archive17.data.networking.CoverUrlBuilder
 import com.kliuchko.archive17.domain.model.Work
+import com.kliuchko.archive17.presentation.components.ArchiveBrand
+import com.kliuchko.archive17.presentation.components.BookCover
+import com.kliuchko.archive17.presentation.components.EmptyMessage
 import org.koin.androidx.compose.koinViewModel
 
 @Composable
 fun SearchScreen(
     onBookClick: (String) -> Unit,
-    onLibraryClick: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: SearchViewModel = koinViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
-    SearchContent(
-        uiState = uiState,
-        onQueryChange = viewModel::onQueryChange,
-        onBookClick = onBookClick,
-        onLibraryClick = onLibraryClick,
-        modifier = modifier,
-    )
-}
-
-@Composable
-private fun SearchContent(
-    uiState: SearchUiState,
-    onQueryChange: (String) -> Unit,
-    onBookClick: (String) -> Unit,
-    onLibraryClick: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
     Column(
         modifier = modifier
             .fillMaxSize()
-            .padding(horizontal = 20.dp, vertical = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
+            .padding(horizontal = 20.dp, vertical = 18.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
+        ArchiveBrand()
+        Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
             Text(
-                text = "Search",
+                text = "Каталог",
                 style = MaterialTheme.typography.headlineMedium,
-                fontWeight = FontWeight.SemiBold,
             )
-            OutlinedButton(onClick = onLibraryClick) {
-                Text(text = "Library")
-            }
+            Text(
+                text = "Что будем читать?",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
 
         OutlinedTextField(
             value = uiState.query,
-            onValueChange = onQueryChange,
+            onValueChange = viewModel::onQueryChange,
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
-            label = { Text(text = "Title or author") },
+            shape = RoundedCornerShape(14.dp),
+            label = { Text(text = "Название или автор") },
+            leadingIcon = {
+                Text(
+                    text = "⌕",
+                    style = MaterialTheme.typography.titleLarge,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            },
         )
 
         Box(
@@ -99,7 +79,7 @@ private fun SearchContent(
                 .fillMaxWidth()
                 .weight(1f),
         ) {
-            SearchResultsState(
+            SearchResults(
                 uiState = uiState,
                 onBookClick = onBookClick,
                 modifier = Modifier.fillMaxSize(),
@@ -109,38 +89,38 @@ private fun SearchContent(
 }
 
 @Composable
-private fun SearchResultsState(
+private fun SearchResults(
     uiState: SearchUiState,
     onBookClick: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     when {
         uiState.isLoading -> {
-            Box(
-                modifier = modifier,
-                contentAlignment = Alignment.Center,
-            ) {
+            Box(modifier = modifier, contentAlignment = Alignment.Center) {
                 CircularProgressIndicator()
             }
         }
 
         uiState.errorMessage != null -> {
-            SearchMessage(
-                text = uiState.errorMessage,
+            EmptyMessage(
+                title = "Каталог временно недоступен",
+                body = uiState.errorMessage,
                 modifier = modifier,
             )
         }
 
         uiState.showMinimumQueryState -> {
-            SearchMessage(
-                text = "Enter at least 2 characters.",
+            EmptyMessage(
+                title = "Нужно ещё немного",
+                body = "Введите не меньше двух символов.",
                 modifier = modifier,
             )
         }
 
         uiState.showEmptyState -> {
-            SearchMessage(
-                text = "No books found.",
+            EmptyMessage(
+                title = "Ничего не найдено",
+                body = "Попробуйте изменить название или имя автора.",
                 modifier = modifier,
             )
         }
@@ -155,18 +135,22 @@ private fun SearchResultsState(
                     items = uiState.books,
                     key = { it.id },
                 ) { work ->
-                    SearchResultItem(
+                    SearchResultCard(
                         work = work,
                         onClick = { onBookClick(work.id) },
                     )
                 }
             }
         }
+
+        else -> {
+            CatalogWelcome(modifier = modifier)
+        }
     }
 }
 
 @Composable
-private fun SearchResultItem(
+private fun SearchResultCard(
     work: Work,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
@@ -175,17 +159,15 @@ private fun SearchResultItem(
         modifier = modifier
             .fillMaxWidth()
             .clickable(onClick = onClick),
-        shape = RoundedCornerShape(8.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant,
-        ),
+        shape = RoundedCornerShape(15.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
     ) {
         Row(
             modifier = Modifier.padding(12.dp),
             horizontalArrangement = Arrangement.spacedBy(14.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            CoverImage(work = work)
+            BookCover(work = work)
             Column(
                 modifier = Modifier.weight(1f),
                 verticalArrangement = Arrangement.spacedBy(4.dp),
@@ -193,86 +175,70 @@ private fun SearchResultItem(
                 Text(
                     text = work.title,
                     style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
                 Text(
-                    text = work.authors.joinToString().ifBlank { "Unknown author" },
-                    style = MaterialTheme.typography.bodyMedium,
+                    text = work.authors.joinToString().ifBlank { "Автор не указан" },
+                    style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
                 Text(
                     text = work.metadataLine(),
-                    style = MaterialTheme.typography.bodySmall,
+                    style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
             }
-        }
-    }
-}
-
-@Composable
-private fun CoverImage(
-    work: Work,
-    modifier: Modifier = Modifier,
-) {
-    val shape = RoundedCornerShape(6.dp)
-    val coverUrl = CoverUrlBuilder.build(work.coverId, CoverSize.MEDIUM)
-
-    if (coverUrl == null) {
-        Box(
-            modifier = modifier
-                .size(width = 56.dp, height = 84.dp)
-                .clip(shape)
-                .background(MaterialTheme.colorScheme.surfaceVariant),
-            contentAlignment = Alignment.Center,
-        ) {
             Text(
-                text = "No cover",
+                text = "Открыть",
                 style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = MaterialTheme.colorScheme.primary,
             )
         }
-    } else {
-        AsyncImage(
-            model = coverUrl,
-            contentDescription = work.title,
-            modifier = modifier
-                .size(width = 56.dp, height = 84.dp)
-                .clip(shape)
-                .background(MaterialTheme.colorScheme.surfaceVariant),
-            contentScale = ContentScale.Crop,
-        )
     }
 }
 
 @Composable
-private fun SearchMessage(
-    text: String,
+private fun CatalogWelcome(
     modifier: Modifier = Modifier,
 ) {
-    Box(
-        modifier = modifier,
-        contentAlignment = Alignment.Center,
+    Column(
+        modifier = modifier.padding(top = 20.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
+        Card(
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+        ) {
+            Column(
+                modifier = Modifier.padding(18.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                Text(
+                    text = "Найдите новую книгу",
+                    style = MaterialTheme.typography.titleLarge,
+                )
+                Text(
+                    text = "Сейчас Archive 17 ищет книги по названию и автору. Полные бесплатные тексты и фильтр доступа появятся на следующем этапе.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
         Text(
-            text = text,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            text = "БЕСПЛАТНЫЕ КНИГИ · СКОРО",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.primary,
         )
     }
 }
 
 private fun Work.metadataLine(): String {
-    val published = firstPublishYear?.let { "First published $it" }
-    val editions = editionCount?.let { "$it editions" }
-
-    return listOfNotNull(published, editions)
-        .joinToString(" | ")
-        .ifBlank { "Publication metadata unavailable" }
+    val published = firstPublishYear?.let { "$it" }
+    val editions = editionCount?.let { "изданий: $it" }
+    return listOfNotNull(published, editions).joinToString(" · ").ifBlank { "Сведения об издании уточняются" }
 }

@@ -1,57 +1,57 @@
 package com.kliuchko.archive17.presentation.theme
 
-import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
-import androidx.compose.material3.dynamicDarkColorScheme
-import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.platform.LocalContext
 
 private val DarkColorScheme = darkColorScheme(
-    primary = Purple80,
-    secondary = PurpleGrey80,
-    tertiary = Pink80
+    primary = ArchiveNightBrass,
+    onPrimary = ArchiveNight,
+    primaryContainer = ArchiveNightBrassSoft,
+    onPrimaryContainer = ArchiveNightInk,
+    secondary = ArchiveNightForest,
+    onSecondary = ArchiveNightInk,
+    tertiary = ArchiveNightWine,
+    onTertiary = ArchiveNightInk,
+    background = ArchiveNight,
+    onBackground = ArchiveNightInk,
+    surface = ArchiveNightRaised,
+    onSurface = ArchiveNightInk,
+    surfaceVariant = ArchiveNightMuted,
+    onSurfaceVariant = ArchiveNightInkMuted,
+    outline = ArchiveNightOutline,
+    outlineVariant = ArchiveNightOutline,
 )
 
 private val LightColorScheme = lightColorScheme(
-    primary = Purple40,
-    secondary = PurpleGrey40,
-    tertiary = Pink40
-
-    /* Other default colors to override
-    background = Color(0xFFFFFBFE),
-    surface = Color(0xFFFFFBFE),
-    onPrimary = Color.White,
-    onSecondary = Color.White,
-    onTertiary = Color.White,
-    onBackground = Color(0xFF1C1B1F),
-    onSurface = Color(0xFF1C1B1F),
-    */
+    primary = ArchiveBrass,
+    onPrimary = ArchivePaperRaised,
+    primaryContainer = ArchiveBrassSoft,
+    onPrimaryContainer = ArchiveInk,
+    secondary = ArchiveForest,
+    onSecondary = ArchivePaperRaised,
+    tertiary = ArchiveWine,
+    onTertiary = ArchivePaperRaised,
+    background = ArchivePaper,
+    onBackground = ArchiveInk,
+    surface = ArchivePaperRaised,
+    onSurface = ArchiveInk,
+    surfaceVariant = ArchivePaperMuted,
+    onSurfaceVariant = ArchiveInkMuted,
+    outline = ArchiveOutline,
+    outlineVariant = ArchiveOutline,
 )
 
 @Composable
 fun Archive17Theme(
     darkTheme: Boolean = isSystemInDarkTheme(),
-    // Dynamic color is available on Android 12+
-    dynamicColor: Boolean = true,
-    content: @Composable () -> Unit
+    content: @Composable () -> Unit,
 ) {
-    val colorScheme = when {
-        dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
-            val context = LocalContext.current
-            if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
-        }
-
-        darkTheme -> DarkColorScheme
-        else -> LightColorScheme
-    }
-
     MaterialTheme(
-        colorScheme = colorScheme,
+        colorScheme = if (darkTheme) DarkColorScheme else LightColorScheme,
         typography = Typography,
-        content = content
+        content = content,
     )
 }
