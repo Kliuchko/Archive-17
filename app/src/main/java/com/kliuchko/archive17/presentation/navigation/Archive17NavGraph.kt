@@ -88,6 +88,9 @@ fun Archive17App(
                             launchSingleTop = true
                         }
                     },
+                    onLocalBookClick = { bookId ->
+                        context.startActivity(EpubReaderActivity.createIntent(context, bookId))
+                    },
                 )
             }
 

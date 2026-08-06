@@ -32,11 +32,13 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.kliuchko.archive17.domain.model.LibraryBook
+import com.kliuchko.archive17.domain.model.LocalBook
 import com.kliuchko.archive17.domain.model.ReadingStatus
 import com.kliuchko.archive17.presentation.components.ArchiveBrand
 import com.kliuchko.archive17.presentation.components.ArchiveNavIcon
 import com.kliuchko.archive17.presentation.components.ArchiveNavigationIcon
 import com.kliuchko.archive17.presentation.components.BookCover
+import com.kliuchko.archive17.presentation.components.LocalBookCover
 import com.kliuchko.archive17.presentation.components.SectionHeading
 import com.kliuchko.archive17.presentation.library.LibraryViewModel
 import org.koin.androidx.compose.koinViewModel
@@ -45,12 +47,20 @@ import java.time.LocalTime
 @Composable
 fun HomeScreen(
     onBookClick: (String) -> Unit,
+    onLocalBookClick: (String) -> Unit,
     onCatalogClick: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: LibraryViewModel = koinViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-    val currentBooks = uiState.books.filter { it.entry.readingStatus == ReadingStatus.READING }
+    val currentBooks = buildList {
+        uiState.books
+            .filter { it.entry.readingStatus == ReadingStatus.READING }
+            .forEach { add(CurrentBook.Catalog(it)) }
+        uiState.localBooks
+            .filter { it.readingStatus == ReadingStatus.READING }
+            .forEach { add(CurrentBook.Local(it)) }
+    }.sortedByDescending(CurrentBook::updatedAt)
     val greeting = remember { greetingForHour(LocalTime.now().hour) }
 
     LazyColumn(
@@ -101,12 +111,18 @@ fun HomeScreen(
         if (currentBooks.isNotEmpty()) {
             items(
                 items = currentBooks.take(2),
-                key = { it.work.id },
-            ) { book ->
-                ContinueReadingCard(
-                    book = book,
-                    onClick = { onBookClick(book.work.id) },
-                )
+                key = CurrentBook::key,
+            ) { currentBook ->
+                when (currentBook) {
+                    is CurrentBook.Catalog -> ContinueReadingCard(
+                        book = currentBook.book,
+                        onClick = { onBookClick(currentBook.book.work.id) },
+                    )
+                    is CurrentBook.Local -> ContinueReadingLocalBookCard(
+                        book = currentBook.book,
+                        onClick = { onLocalBookClick(currentBook.book.id) },
+                    )
+                }
             }
         } else {
             item {
@@ -175,6 +191,21 @@ fun HomeScreen(
     }
 }
 
+private sealed interface CurrentBook {
+    val key: String
+    val updatedAt: Long
+
+    data class Catalog(val book: LibraryBook) : CurrentBook {
+        override val key: String = "catalog-${book.work.id}"
+        override val updatedAt: Long = book.entry.updatedAt
+    }
+
+    data class Local(val book: LocalBook) : CurrentBook {
+        override val key: String = "local-${book.id}"
+        override val updatedAt: Long = book.updatedAt
+    }
+}
+
 @Composable
 private fun ContinueReadingCard(
     book: LibraryBook,
@@ -215,6 +246,62 @@ private fun ContinueReadingCard(
                 )
                 Text(
                     text = book.work.authors.joinToString().ifBlank { "Автор не указан" },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    text = "Вернуться к книге →",
+                    modifier = Modifier.padding(top = 5.dp),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ContinueReadingLocalBookCard(
+    book: LocalBook,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Card(
+        modifier = modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick),
+        shape = RoundedCornerShape(18.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+    ) {
+        Row(
+            modifier = Modifier.padding(16.dp),
+            horizontalArrangement = Arrangement.spacedBy(14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            LocalBookCover(
+                book = book,
+                width = 68.dp,
+                height = 100.dp,
+            )
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(5.dp),
+            ) {
+                Text(
+                    text = "ВЫ ОСТАНОВИЛИСЬ ЗДЕСЬ",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+                Text(
+                    text = book.title,
+                    style = MaterialTheme.typography.titleLarge,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    text = book.author ?: "Автор не указан",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
