@@ -39,7 +39,7 @@ class FreeBookDetailsViewModel(
 
     fun downloadBook() {
         val book = _uiState.value.details?.book ?: return
-        if (_uiState.value.isDownloading) return
+        if (_uiState.value.isDownloading || !book.isDownloadable) return
 
         viewModelScope.launch {
             _uiState.update {

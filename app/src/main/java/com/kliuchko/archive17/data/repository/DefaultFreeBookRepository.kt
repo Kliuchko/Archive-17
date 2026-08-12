@@ -3,12 +3,15 @@ package com.kliuchko.archive17.data.repository
 import android.content.Context
 import com.kliuchko.archive17.data.networking.api.InternetArchiveApi
 import com.kliuchko.archive17.data.networking.api.OpenLibraryApi
+import com.kliuchko.archive17.data.networking.api.WikisourceApi
 import com.kliuchko.archive17.data.networking.dto.InternetArchiveFileDto
+import com.kliuchko.archive17.data.networking.mapper.curatedRussianWikisourceBooks
 import com.kliuchko.archive17.data.networking.mapper.toFreeBooks
 import com.kliuchko.archive17.data.networking.mapper.toDomain
 import com.kliuchko.archive17.domain.model.DownloadedBookMetadata
 import com.kliuchko.archive17.domain.model.FreeBook
 import com.kliuchko.archive17.domain.model.FreeBookDetails
+import com.kliuchko.archive17.domain.model.FreeBookSource
 import com.kliuchko.archive17.domain.model.LocalBook
 import com.kliuchko.archive17.domain.model.Work
 import com.kliuchko.archive17.domain.repository.FreeBookRepository
@@ -25,6 +28,7 @@ import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withContext
 import okhttp3.HttpUrl.Companion.toHttpUrl
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.OkHttpClient
 import okhttp3.Request
 
@@ -32,6 +36,7 @@ class DefaultFreeBookRepository(
     context: Context,
     private val openLibraryApi: OpenLibraryApi,
     private val internetArchiveApi: InternetArchiveApi,
+    private val wikisourceApi: WikisourceApi,
     private val client: OkHttpClient,
     private val localBookRepository: LocalBookRepository,
 ) : FreeBookRepository {
@@ -51,19 +56,26 @@ class DefaultFreeBookRepository(
             return RepositoryResult.Error("Не удалось определить язык бесплатных книг.")
         }
 
-        return try {
+        val (openLibraryBooks, openLibraryError) = fetchBooksSafely {
             val catalogQuery = normalizedQuery.ifBlank { STARTER_CATALOG_QUERY }
             val searchQuery = "$catalogQuery ebook_access:public language:$languageCode"
-            val books = openLibraryApi.searchFreeBooks(
+            openLibraryApi.searchFreeBooks(
                 query = searchQuery,
                 language = languageCode.toIso6391(),
                 page = page.coerceAtLeast(1),
             ).toFreeBooks(expectedLanguageCode = languageCode)
+        }
+        val (wikisourceBooks, wikisourceError) = fetchBooksSafely {
+            searchWikisourceBooks(normalizedQuery, languageCode, page)
+        }
+
+        return if (openLibraryError != null && wikisourceError != null) {
+            RepositoryResult.Error("Не удалось найти бесплатные книги.")
+        } else {
+            val books = interleaveBooks(wikisourceBooks, openLibraryBooks)
+                .distinctBy { it.title.trim().lowercase() }
             books.forEach { book -> booksByEditionId[book.editionId] = book }
             RepositoryResult.Success(books)
-        } catch (exception: Throwable) {
-            if (exception is CancellationException) throw exception
-            RepositoryResult.Error("Не удалось найти бесплатные книги.")
         }
     }
 
@@ -72,6 +84,16 @@ class DefaultFreeBookRepository(
     ): RepositoryResult<FreeBookDetails> {
         val book = booksByEditionId[editionId]
             ?: return RepositoryResult.Error("Откройте книгу ещё раз из Каталога.")
+
+        if (book.source == FreeBookSource.WIKISOURCE) {
+            return RepositoryResult.Success(
+                FreeBookDetails(
+                    book = book,
+                    description = null,
+                    subjects = emptyList(),
+                ),
+            )
+        }
 
         return try {
             val fallback = Work(
@@ -117,11 +139,15 @@ class DefaultFreeBookRepository(
             return RepositoryResult.Error("Не удалось проверить язык EPUB-файлов.")
         }
 
-        val identifiers = books
+        val directlyDownloadable = books
+            .filter { it.source == FreeBookSource.WIKISOURCE && it.epubDownloadUrl != null }
+            .onEach { book -> booksByEditionId[book.editionId] = book }
+        val archiveBooks = books.filter { it.source == FreeBookSource.OPEN_LIBRARY }
+        val identifiers = archiveBooks
             .map(FreeBook::archiveIdentifier)
             .filter { it.matches(ARCHIVE_IDENTIFIER_PATTERN) }
             .distinct()
-        if (identifiers.isEmpty()) return RepositoryResult.Success(emptyList())
+        if (identifiers.isEmpty()) return RepositoryResult.Success(directlyDownloadable)
 
         return try {
             val identifierQuery = identifiers.joinToString(separator = " OR ")
@@ -135,7 +161,7 @@ class DefaultFreeBookRepository(
                 .mapNotNull { it.identifier?.trim()?.takeIf(String::isNotEmpty) }
                 .toSet()
             val verifiedBooks = coroutineScope {
-                books
+                archiveBooks
                     .filter { it.archiveIdentifier in downloadableIdentifiers }
                     .map { book ->
                         async {
@@ -156,10 +182,17 @@ class DefaultFreeBookRepository(
                     .awaitAll()
                     .filterNotNull()
             }
-            RepositoryResult.Success(verifiedBooks)
+            RepositoryResult.Success(directlyDownloadable + verifiedBooks)
         } catch (exception: Throwable) {
             if (exception is CancellationException) throw exception
-            RepositoryResult.Error("Не удалось проверить доступность EPUB-файлов.")
+            if (directlyDownloadable.isNotEmpty()) {
+                RepositoryResult.Cached(
+                    data = directlyDownloadable,
+                    message = "Часть EPUB из Internet Archive пока не удалось проверить.",
+                )
+            } else {
+                RepositoryResult.Error("Не удалось проверить доступность EPUB-файлов.")
+            }
         }
     }
 
@@ -168,15 +201,19 @@ class DefaultFreeBookRepository(
             downloadDirectory.mkdirs()
             val temporaryFile = File(downloadDirectory, "${UUID.randomUUID()}.epub")
             try {
-                val fileName = book.epubFileName
+                val downloadUrl = book.epubDownloadUrl
+                    ?.toHttpUrlOrNull()
+                    ?.takeIf { it.isHttps && it.host == WS_EXPORT_HOST }
+                    ?: book.epubFileName?.let { fileName ->
+                        "https://archive.org".toHttpUrl().newBuilder()
+                            .addPathSegment("download")
+                            .addPathSegment(book.archiveIdentifier)
+                            .addPathSegment(fileName)
+                            .build()
+                    }
                     ?: return@withContext RepositoryResult.Error(
                         "EPUB этого издания не прошёл проверку доступности.",
                     )
-                val downloadUrl = "https://archive.org".toHttpUrl().newBuilder()
-                    .addPathSegment("download")
-                    .addPathSegment(book.archiveIdentifier)
-                    .addPathSegment(fileName)
-                    .build()
                 val request = Request.Builder().url(downloadUrl).build()
 
                 client.newCall(request).execute().use { response ->
@@ -204,7 +241,7 @@ class DefaultFreeBookRepository(
                         author = book.authors.firstOrNull(),
                         identifier = book.editionId,
                         languageCode = book.languageCode,
-                        sourceName = SOURCE_NAME,
+                        sourceName = book.sourceName,
                         sourceUrl = book.sourceUrl,
                         isPublicAccess = true,
                     ),
@@ -229,6 +266,42 @@ class DefaultFreeBookRepository(
             copied += count
             check(copied <= maxBytes) { "EPUB exceeds download limit" }
             output.write(buffer, 0, count)
+        }
+    }
+
+    private suspend fun searchWikisourceBooks(
+        query: String,
+        languageCode: String,
+        page: Int,
+    ): List<FreeBook> {
+        if (languageCode != RUSSIAN_LANGUAGE) return emptyList()
+        if (query.isBlank()) return curatedRussianWikisourceBooks(page)
+
+        val safeQuery = query.replace('"', ' ').trim()
+        if (safeQuery.isEmpty()) return emptyList()
+        return wikisourceApi.search(
+            query = "intitle:\"$safeQuery\"",
+            offset = (page.coerceAtLeast(1) - 1) * WikisourceApi.SEARCH_LIMIT,
+        ).toFreeBooks(languageCode)
+    }
+
+    private suspend fun fetchBooksSafely(
+        block: suspend () -> List<FreeBook>,
+    ): Pair<List<FreeBook>, Throwable?> = try {
+        block() to null
+    } catch (exception: Throwable) {
+        if (exception is CancellationException) throw exception
+        emptyList<FreeBook>() to exception
+    }
+
+    private fun interleaveBooks(
+        primary: List<FreeBook>,
+        secondary: List<FreeBook>,
+    ): List<FreeBook> = buildList(primary.size + secondary.size) {
+        val maxSize = maxOf(primary.size, secondary.size)
+        repeat(maxSize) { index ->
+            primary.getOrNull(index)?.let(::add)
+            secondary.getOrNull(index)?.let(::add)
         }
     }
 
@@ -265,9 +338,10 @@ class DefaultFreeBookRepository(
     private companion object {
         const val MIN_SEARCH_QUERY_LENGTH = 2
         const val MAX_EPUB_BYTES = 50L * 1024L * 1024L
-        const val SOURCE_NAME = "Open Library · Internet Archive"
         const val STARTER_CATALOG_QUERY = "subject:fiction"
         const val MAX_DETAIL_SUBJECTS = 6
+        const val RUSSIAN_LANGUAGE = "rus"
+        const val WS_EXPORT_HOST = "ws-export.wmcloud.org"
         val ISO_639_2_PATTERN = Regex("[a-z]{3}")
         val ARCHIVE_IDENTIFIER_PATTERN = Regex("[A-Za-z0-9._-]+")
     }

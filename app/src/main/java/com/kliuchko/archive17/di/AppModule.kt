@@ -7,6 +7,7 @@ import com.kliuchko.archive17.core.time.TimeProvider
 import com.kliuchko.archive17.data.local.Archive17Database
 import com.kliuchko.archive17.data.networking.api.OpenLibraryApi
 import com.kliuchko.archive17.data.networking.api.InternetArchiveApi
+import com.kliuchko.archive17.data.networking.api.WikisourceApi
 import com.kliuchko.archive17.data.repository.DefaultBookRepository
 import com.kliuchko.archive17.data.repository.DefaultFreeBookRepository
 import com.kliuchko.archive17.data.reader.ReadiumService
@@ -96,6 +97,15 @@ val appModule = module {
             .create(InternetArchiveApi::class.java)
     }
 
+    single<WikisourceApi> {
+        Retrofit.Builder()
+            .baseUrl(WikisourceApi.BASE_URL)
+            .client(get())
+            .addConverterFactory(GsonConverterFactory.create())
+            .build()
+            .create(WikisourceApi::class.java)
+    }
+
     single<BookRepository> {
         DefaultBookRepository(
             api = get(),
@@ -123,6 +133,7 @@ val appModule = module {
             context = androidContext(),
             openLibraryApi = get(),
             internetArchiveApi = get(),
+            wikisourceApi = get(),
             client = get(),
             localBookRepository = get(),
         )

@@ -116,9 +116,7 @@ fun FreeBookDetailsScreen(
                     Text(
                         text = listOfNotNull(
                             book.firstPublishYear?.toString(),
-                            stringResource(R.string.epub_format).takeIf {
-                                book.epubFileName != null
-                            },
+                            stringResource(R.string.epub_format).takeIf { book.isDownloadable },
                             book.epubSizeBytes?.let(::formatFileSize),
                         ).joinToString(" · "),
                         style = MaterialTheme.typography.bodySmall,
@@ -138,7 +136,7 @@ fun FreeBookDetailsScreen(
                 DetailFact(
                     label = stringResource(R.string.access_label),
                     value = stringResource(
-                        if (book.epubFileName != null) {
+                        if (book.isDownloadable) {
                             R.string.public_access
                         } else {
                             R.string.open_edition
@@ -146,7 +144,7 @@ fun FreeBookDetailsScreen(
                     ),
                 )
 
-                if (book.epubFileName != null) {
+                if (book.isDownloadable) {
                     Button(
                         onClick = viewModel::downloadBook,
                         enabled = !uiState.isDownloading,
@@ -212,7 +210,7 @@ fun FreeBookDetailsScreen(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     Text(
-                        text = stringResource(R.string.free_source),
+                        text = book.sourceName,
                         style = MaterialTheme.typography.bodyMedium,
                     )
                     Text(

@@ -345,9 +345,11 @@ private fun FreeBookResultCard(
                     color = MaterialTheme.colorScheme.primary,
                 )
                 Text(
-                    text = stringResource(
-                        if (canDownload) R.string.free_source else R.string.epub_not_confirmed_short,
-                    ),
+                    text = if (canDownload) {
+                        book.sourceName
+                    } else {
+                        stringResource(R.string.epub_not_confirmed_short)
+                    },
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )

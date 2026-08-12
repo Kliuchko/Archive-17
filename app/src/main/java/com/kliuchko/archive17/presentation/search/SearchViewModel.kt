@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.kliuchko.archive17.domain.model.BookLanguage
 import com.kliuchko.archive17.domain.model.FreeBook
+import com.kliuchko.archive17.domain.model.FreeBookSource
 import com.kliuchko.archive17.domain.model.Work
 import com.kliuchko.archive17.domain.repository.BookRepository
 import com.kliuchko.archive17.domain.repository.FreeBookRepository
@@ -97,7 +98,7 @@ class SearchViewModel(
     }
 
     fun downloadBook(book: FreeBook) {
-        if (_uiState.value.downloadingBookId != null || book.epubFileName == null) return
+        if (_uiState.value.downloadingBookId != null || !book.isDownloadable) return
         viewModelScope.launch {
             _uiState.update {
                 it.copy(
@@ -253,12 +254,15 @@ class SearchViewModel(
         }
         _uiState.update { state ->
             val verified = (state.freeBooks + additionalPages.flatMap { it.verified })
-                .distinctBy(FreeBook::editionId)
+                .sortedByDescending { it.source == FreeBookSource.WIKISOURCE }
+                .distinctBy { it.title.trim().lowercase() }
                 .take(CATALOG_TARGET_SIZE)
             val verifiedIds = verified.mapTo(mutableSetOf(), FreeBook::editionId)
+            val verifiedTitles = verified.mapTo(mutableSetOf()) { it.title.trim().lowercase() }
             val other = (state.otherFreeBooks + additionalPages.flatMap { it.other })
-                .distinctBy(FreeBook::editionId)
+                .distinctBy { it.title.trim().lowercase() }
                 .filterNot { it.editionId in verifiedIds }
+                .filterNot { it.title.trim().lowercase() in verifiedTitles }
                 .take(OTHER_CATALOG_SIZE)
             state.copy(
                 isCheckingFreeBooks = false,
@@ -348,7 +352,7 @@ class SearchViewModel(
     private companion object {
         const val SEARCH_DEBOUNCE_MILLIS = 350L
         const val STARTER_ALL_BOOKS_QUERY = "subject:fiction"
-        const val CATALOG_TARGET_SIZE = 10
+        const val CATALOG_TARGET_SIZE = 18
         const val OTHER_CATALOG_SIZE = 20
         const val MAX_CATALOG_PAGES = 3
     }
