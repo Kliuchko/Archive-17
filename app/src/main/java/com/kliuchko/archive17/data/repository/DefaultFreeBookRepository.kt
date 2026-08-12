@@ -5,7 +5,9 @@ import com.kliuchko.archive17.data.networking.api.InternetArchiveApi
 import com.kliuchko.archive17.data.networking.api.OpenLibraryApi
 import com.kliuchko.archive17.data.networking.api.WikisourceApi
 import com.kliuchko.archive17.data.networking.dto.InternetArchiveFileDto
+import com.kliuchko.archive17.data.networking.mapper.curatedEnglishStandardEbooks
 import com.kliuchko.archive17.data.networking.mapper.curatedRussianWikisourceBooks
+import com.kliuchko.archive17.data.networking.mapper.standardEbookDetails
 import com.kliuchko.archive17.data.networking.mapper.toFreeBooks
 import com.kliuchko.archive17.data.networking.mapper.toDomain
 import com.kliuchko.archive17.domain.model.DownloadedBookMetadata
@@ -65,15 +67,15 @@ class DefaultFreeBookRepository(
                 page = page.coerceAtLeast(1),
             ).toFreeBooks(expectedLanguageCode = languageCode)
         }
-        val (wikisourceBooks, wikisourceError) = fetchBooksSafely {
-            searchWikisourceBooks(normalizedQuery, languageCode, page)
+        val (primarySourceBooks, primarySourceError) = fetchBooksSafely {
+            searchPrimarySourceBooks(normalizedQuery, languageCode, page)
         }
 
-        return if (openLibraryError != null && wikisourceError != null) {
+        return if (openLibraryError != null && primarySourceError != null) {
             RepositoryResult.Error("Не удалось найти бесплатные книги.")
         } else {
-            val books = interleaveBooks(wikisourceBooks, openLibraryBooks)
-                .distinctBy { it.title.trim().lowercase() }
+            val books = interleaveBooks(primarySourceBooks, openLibraryBooks)
+                .distinctBy(FreeBook::catalogTitleKey)
             books.forEach { book -> booksByEditionId[book.editionId] = book }
             RepositoryResult.Success(books)
         }
@@ -93,6 +95,13 @@ class DefaultFreeBookRepository(
                     subjects = emptyList(),
                 ),
             )
+        }
+        if (book.source == FreeBookSource.STANDARD_EBOOKS) {
+            return standardEbookDetails(book)
+                ?.let { RepositoryResult.Success(it) }
+                ?: RepositoryResult.Success(
+                    FreeBookDetails(book = book, description = null, subjects = emptyList()),
+                )
         }
 
         return try {
@@ -140,7 +149,7 @@ class DefaultFreeBookRepository(
         }
 
         val directlyDownloadable = books
-            .filter { it.source == FreeBookSource.WIKISOURCE && it.epubDownloadUrl != null }
+            .filter { it.source != FreeBookSource.OPEN_LIBRARY && it.epubDownloadUrl != null }
             .onEach { book -> booksByEditionId[book.editionId] = book }
         val archiveBooks = books.filter { it.source == FreeBookSource.OPEN_LIBRARY }
         val identifiers = archiveBooks
@@ -203,7 +212,7 @@ class DefaultFreeBookRepository(
             try {
                 val downloadUrl = book.epubDownloadUrl
                     ?.toHttpUrlOrNull()
-                    ?.takeIf { it.isHttps && it.host == WS_EXPORT_HOST }
+                    ?.takeIf { url -> book.isTrustedDirectDownload(url.host, url.encodedPath) }
                     ?: book.epubFileName?.let { fileName ->
                         "https://archive.org".toHttpUrl().newBuilder()
                             .addPathSegment("download")
@@ -269,12 +278,20 @@ class DefaultFreeBookRepository(
         }
     }
 
-    private suspend fun searchWikisourceBooks(
+    private suspend fun searchPrimarySourceBooks(
         query: String,
         languageCode: String,
         page: Int,
+    ): List<FreeBook> = when (languageCode) {
+        RUSSIAN_LANGUAGE -> searchWikisourceBooks(query, page)
+        ENGLISH_LANGUAGE -> curatedEnglishStandardEbooks(query, page)
+        else -> emptyList()
+    }
+
+    private suspend fun searchWikisourceBooks(
+        query: String,
+        page: Int,
     ): List<FreeBook> {
-        if (languageCode != RUSSIAN_LANGUAGE) return emptyList()
         if (query.isBlank()) return curatedRussianWikisourceBooks(page)
 
         val safeQuery = query.replace('"', ' ').trim()
@@ -282,8 +299,18 @@ class DefaultFreeBookRepository(
         return wikisourceApi.search(
             query = "intitle:\"$safeQuery\"",
             offset = (page.coerceAtLeast(1) - 1) * WikisourceApi.SEARCH_LIMIT,
-        ).toFreeBooks(languageCode)
+        ).toFreeBooks(RUSSIAN_LANGUAGE)
     }
+
+    private fun FreeBook.isTrustedDirectDownload(host: String, path: String): Boolean =
+        when (source) {
+            FreeBookSource.WIKISOURCE -> host == WS_EXPORT_HOST
+            FreeBookSource.STANDARD_EBOOKS ->
+                host == STANDARD_EBOOKS_HOST &&
+                    path.startsWith("/ebooks/") &&
+                    path.endsWith(".epub")
+            FreeBookSource.OPEN_LIBRARY -> false
+        }
 
     private suspend fun fetchBooksSafely(
         block: suspend () -> List<FreeBook>,
@@ -341,7 +368,9 @@ class DefaultFreeBookRepository(
         const val STARTER_CATALOG_QUERY = "subject:fiction"
         const val MAX_DETAIL_SUBJECTS = 6
         const val RUSSIAN_LANGUAGE = "rus"
+        const val ENGLISH_LANGUAGE = "eng"
         const val WS_EXPORT_HOST = "ws-export.wmcloud.org"
+        const val STANDARD_EBOOKS_HOST = "standardebooks.org"
         val ISO_639_2_PATTERN = Regex("[a-z]{3}")
         val ARCHIVE_IDENTIFIER_PATTERN = Regex("[A-Za-z0-9._-]+")
     }

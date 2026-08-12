@@ -161,7 +161,7 @@ fun FreeBookCover(
     height: Dp = 86.dp,
 ) {
     val shape = RoundedCornerShape(topStart = 5.dp, topEnd = 9.dp, bottomEnd = 9.dp, bottomStart = 5.dp)
-    val coverUrl = CoverUrlBuilder.build(book.coverId, CoverSize.MEDIUM)
+    val coverUrl = book.coverUrl ?: CoverUrlBuilder.build(book.coverId, CoverSize.MEDIUM)
     if (coverUrl == null) {
         GeneratedCover(book.title, modifier, width, height)
     } else {

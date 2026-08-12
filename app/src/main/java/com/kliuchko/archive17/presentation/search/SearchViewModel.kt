@@ -254,15 +254,15 @@ class SearchViewModel(
         }
         _uiState.update { state ->
             val verified = (state.freeBooks + additionalPages.flatMap { it.verified })
-                .sortedByDescending { it.source == FreeBookSource.WIKISOURCE }
-                .distinctBy { it.title.trim().lowercase() }
+                .sortedByDescending { it.source != FreeBookSource.OPEN_LIBRARY }
+                .distinctBy(FreeBook::catalogTitleKey)
                 .take(CATALOG_TARGET_SIZE)
             val verifiedIds = verified.mapTo(mutableSetOf(), FreeBook::editionId)
-            val verifiedTitles = verified.mapTo(mutableSetOf()) { it.title.trim().lowercase() }
+            val verifiedTitles = verified.mapTo(mutableSetOf(), FreeBook::catalogTitleKey)
             val other = (state.otherFreeBooks + additionalPages.flatMap { it.other })
-                .distinctBy { it.title.trim().lowercase() }
+                .distinctBy(FreeBook::catalogTitleKey)
                 .filterNot { it.editionId in verifiedIds }
-                .filterNot { it.title.trim().lowercase() in verifiedTitles }
+                .filterNot { it.catalogTitleKey in verifiedTitles }
                 .take(OTHER_CATALOG_SIZE)
             state.copy(
                 isCheckingFreeBooks = false,
