@@ -73,6 +73,12 @@ data class FreeBookDetails(
     val subjects: List<String>,
 )
 
+data class TemporaryBook(
+    val editionId: String,
+    val title: String,
+    val filePath: String,
+)
+
 data class DownloadedBookMetadata(
     val title: String,
     val author: String?,

@@ -15,6 +15,7 @@ import com.kliuchko.archive17.domain.model.FreeBook
 import com.kliuchko.archive17.domain.model.FreeBookDetails
 import com.kliuchko.archive17.domain.model.FreeBookSource
 import com.kliuchko.archive17.domain.model.LocalBook
+import com.kliuchko.archive17.domain.model.TemporaryBook
 import com.kliuchko.archive17.domain.model.Work
 import com.kliuchko.archive17.domain.repository.FreeBookRepository
 import com.kliuchko.archive17.domain.repository.LocalBookRepository
@@ -46,6 +47,10 @@ class DefaultFreeBookRepository(
     private val localBookRepository: LocalBookRepository,
 ) : FreeBookRepository {
     private val downloadDirectory = File(context.applicationContext.cacheDir, "free-book-downloads")
+    private val temporaryReadingDirectory = File(
+        context.applicationContext.cacheDir,
+        TEMPORARY_READING_DIRECTORY,
+    )
     private val booksByEditionId = ConcurrentHashMap<String, FreeBook>()
     private val catalogCache = FreeBookCatalogCache(context)
     private val catalogRefreshScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -233,37 +238,10 @@ class DefaultFreeBookRepository(
             downloadDirectory.mkdirs()
             val temporaryFile = File(downloadDirectory, "${UUID.randomUUID()}.epub")
             try {
-                val downloadUrl = book.epubDownloadUrl
-                    ?.toHttpUrlOrNull()
-                    ?.takeIf { url -> book.isTrustedDirectDownload(url.host, url.encodedPath) }
-                    ?: book.epubFileName?.let { fileName ->
-                        "https://archive.org".toHttpUrl().newBuilder()
-                            .addPathSegment("download")
-                            .addPathSegment(book.archiveIdentifier)
-                            .addPathSegment(fileName)
-                            .build()
-                    }
-                    ?: return@withContext RepositoryResult.Error(
-                        "EPUB этого издания не прошёл проверку доступности.",
-                    )
-                val request = Request.Builder().url(downloadUrl).build()
-
-                client.newCall(request).execute().use { response ->
-                    if (!response.isSuccessful) {
-                        return@withContext RepositoryResult.Error(
-                            "Источник временно не отдаёт файл книги.",
-                        )
-                    }
-                    val body = response.body
-                        ?: return@withContext RepositoryResult.Error(
-                            "Источник вернул пустой файл книги.",
-                        )
-                    if (body.contentLength() > MAX_EPUB_BYTES) {
-                        return@withContext RepositoryResult.Error("EPUB-файл слишком большой для загрузки.")
-                    }
-                    temporaryFile.outputStream().buffered().use { output ->
-                        body.byteStream().buffered().copyToWithLimit(output, MAX_EPUB_BYTES)
-                    }
+                when (val download = downloadBookFile(book, temporaryFile)) {
+                    is RepositoryResult.Error -> return@withContext download
+                    is RepositoryResult.Cached -> return@withContext RepositoryResult.Error(download.message)
+                    is RepositoryResult.Success -> Unit
                 }
 
                 localBookRepository.importDownloadedBook(
@@ -285,6 +263,95 @@ class DefaultFreeBookRepository(
                 temporaryFile.delete()
             }
         }
+
+    override suspend fun downloadForReading(
+        book: FreeBook,
+    ): RepositoryResult<TemporaryBook> = withContext(Dispatchers.IO) {
+        temporaryReadingDirectory.mkdirs()
+        val stableName = UUID.nameUUIDFromBytes(book.editionId.toByteArray()).toString()
+        val cachedFile = File(temporaryReadingDirectory, "$stableName.epub")
+        if (cachedFile.hasEpubSignature()) {
+            cachedFile.setLastModified(System.currentTimeMillis())
+            return@withContext RepositoryResult.Success(book.toTemporaryBook(cachedFile))
+        }
+
+        val partialFile = File(temporaryReadingDirectory, "$stableName.part")
+        try {
+            partialFile.delete()
+            when (val download = downloadBookFile(book, partialFile)) {
+                is RepositoryResult.Error -> return@withContext download
+                is RepositoryResult.Cached -> return@withContext RepositoryResult.Error(download.message)
+                is RepositoryResult.Success -> Unit
+            }
+            if (!partialFile.hasEpubSignature()) {
+                return@withContext RepositoryResult.Error(
+                    "Источник вернул файл, который не удалось распознать как EPUB.",
+                )
+            }
+            cachedFile.delete()
+            if (!partialFile.renameTo(cachedFile)) {
+                partialFile.copyTo(cachedFile, overwrite = true)
+            }
+            cleanTemporaryReadingCache(except = cachedFile)
+            RepositoryResult.Success(book.toTemporaryBook(cachedFile))
+        } catch (exception: Throwable) {
+            if (exception is CancellationException) throw exception
+            RepositoryResult.Error("Не удалось открыть книгу. Попробуйте ещё раз позже.")
+        } finally {
+            partialFile.delete()
+        }
+    }
+
+    private fun downloadBookFile(
+        book: FreeBook,
+        destination: File,
+    ): RepositoryResult<File> {
+        val downloadUrl = book.epubDownloadUrl
+            ?.toHttpUrlOrNull()
+            ?.takeIf { url -> book.isTrustedDirectDownload(url.host, url.encodedPath) }
+            ?: book.epubFileName?.let { fileName ->
+                "https://archive.org".toHttpUrl().newBuilder()
+                    .addPathSegment("download")
+                    .addPathSegment(book.archiveIdentifier)
+                    .addPathSegment(fileName)
+                    .build()
+            }
+            ?: return RepositoryResult.Error(
+                "EPUB этого издания не прошёл проверку доступности.",
+            )
+        val request = Request.Builder().url(downloadUrl).build()
+
+        client.newCall(request).execute().use { response ->
+            if (!response.isSuccessful) {
+                return RepositoryResult.Error("Источник временно не отдаёт файл книги.")
+            }
+            val body = response.body
+                ?: return RepositoryResult.Error("Источник вернул пустой файл книги.")
+            if (body.contentLength() > MAX_EPUB_BYTES) {
+                return RepositoryResult.Error("EPUB-файл слишком большой для загрузки.")
+            }
+            destination.outputStream().buffered().use { output ->
+                body.byteStream().buffered().copyToWithLimit(output, MAX_EPUB_BYTES)
+            }
+        }
+        return RepositoryResult.Success(destination)
+    }
+
+    private fun FreeBook.toTemporaryBook(file: File): TemporaryBook = TemporaryBook(
+        editionId = editionId,
+        title = title,
+        filePath = file.absolutePath,
+    )
+
+    private fun cleanTemporaryReadingCache(except: File) {
+        temporaryReadingDirectory.listFiles()
+            .orEmpty()
+            .asSequence()
+            .filter { it.extension.equals("epub", ignoreCase = true) && it != except }
+            .sortedByDescending(File::lastModified)
+            .drop(MAX_TEMPORARY_BOOKS - 1)
+            .forEach(File::delete)
+    }
 
     private fun InputStream.copyToWithLimit(
         output: java.io.OutputStream,
@@ -420,6 +487,8 @@ class DefaultFreeBookRepository(
     private companion object {
         const val MIN_SEARCH_QUERY_LENGTH = 2
         const val MAX_EPUB_BYTES = 50L * 1024L * 1024L
+        const val MAX_TEMPORARY_BOOKS = 4
+        const val TEMPORARY_READING_DIRECTORY = "temporary-reading"
         const val STARTER_CATALOG_QUERY = "subject:fiction"
         const val MAX_DETAIL_SUBJECTS = 6
         const val RUSSIAN_LANGUAGE = "rus"
@@ -430,3 +499,14 @@ class DefaultFreeBookRepository(
         val ARCHIVE_IDENTIFIER_PATTERN = Regex("[A-Za-z0-9._-]+")
     }
 }
+
+internal fun File.hasEpubSignature(): Boolean {
+    if (!isFile || length() < MIN_EPUB_BYTES) return false
+    return inputStream().buffered().use { input ->
+        input.read() == ZIP_MAGIC_FIRST_BYTE && input.read() == ZIP_MAGIC_SECOND_BYTE
+    }
+}
+
+private const val MIN_EPUB_BYTES = 4L
+private const val ZIP_MAGIC_FIRST_BYTE = 0x50
+private const val ZIP_MAGIC_SECOND_BYTE = 0x4B

@@ -109,7 +109,13 @@ class SearchViewModel(
     }
 
     fun downloadBook(book: FreeBook) {
-        if (_uiState.value.downloadingBookId != null || !book.isDownloadable) return
+        if (
+            _uiState.value.downloadingBookId != null ||
+            _uiState.value.readingBookId != null ||
+            !book.isDownloadable
+        ) {
+            return
+        }
         viewModelScope.launch {
             _uiState.update {
                 it.copy(
@@ -136,6 +142,36 @@ class SearchViewModel(
 
     fun onDownloadedBookHandled() {
         _uiState.update { it.copy(downloadedBookId = null) }
+    }
+
+    fun readNow(book: FreeBook) {
+        if (
+            _uiState.value.downloadingBookId != null ||
+            _uiState.value.readingBookId != null ||
+            !book.isDownloadable
+        ) {
+            return
+        }
+        viewModelScope.launch {
+            _uiState.update {
+                it.copy(readingBookId = book.editionId, actionMessage = null)
+            }
+            when (val result = freeBookRepository.downloadForReading(book)) {
+                is RepositoryResult.Success -> _uiState.update {
+                    it.copy(readingBookId = null, temporaryBook = result.data)
+                }
+                is RepositoryResult.Cached -> _uiState.update {
+                    it.copy(readingBookId = null, actionMessage = result.message)
+                }
+                is RepositoryResult.Error -> _uiState.update {
+                    it.copy(readingBookId = null, actionMessage = result.message)
+                }
+            }
+        }
+    }
+
+    fun onTemporaryBookHandled() {
+        _uiState.update { it.copy(temporaryBook = null) }
     }
 
     fun loadNextPage() {

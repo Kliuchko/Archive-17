@@ -24,6 +24,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -38,6 +39,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.kliuchko.archive17.R
 import com.kliuchko.archive17.domain.model.Work
 import com.kliuchko.archive17.domain.model.FreeBook
+import com.kliuchko.archive17.domain.model.TemporaryBook
 import com.kliuchko.archive17.presentation.components.ArchiveBrand
 import com.kliuchko.archive17.presentation.components.BookCover
 import com.kliuchko.archive17.presentation.components.EmptyMessage
@@ -50,6 +52,7 @@ fun SearchScreen(
     onBookClick: (String) -> Unit,
     onFreeBookClick: (String) -> Unit,
     onFreeBookReady: (String) -> Unit,
+    onTemporaryBookReady: (TemporaryBook) -> Unit,
     modifier: Modifier = Modifier,
     viewModel: SearchViewModel = koinViewModel(),
 ) {
@@ -59,6 +62,13 @@ fun SearchScreen(
         uiState.downloadedBookId?.let { bookId ->
             onFreeBookReady(bookId)
             viewModel.onDownloadedBookHandled()
+        }
+    }
+
+    LaunchedEffect(uiState.temporaryBook) {
+        uiState.temporaryBook?.let { book ->
+            onTemporaryBookReady(book)
+            viewModel.onTemporaryBookHandled()
         }
     }
 
@@ -143,6 +153,7 @@ fun SearchScreen(
                 onBookClick = onBookClick,
                 onFreeBookClick = onFreeBookClick,
                 onDownloadBook = viewModel::downloadBook,
+                onReadNow = viewModel::readNow,
                 onLoadNextPage = viewModel::loadNextPage,
                 onRetryNextPage = viewModel::retryNextPage,
                 modifier = Modifier.fillMaxSize(),
@@ -157,6 +168,7 @@ private fun SearchResults(
     onBookClick: (String) -> Unit,
     onFreeBookClick: (String) -> Unit,
     onDownloadBook: (FreeBook) -> Unit,
+    onReadNow: (FreeBook) -> Unit,
     onLoadNextPage: () -> Unit,
     onRetryNextPage: () -> Unit,
     modifier: Modifier = Modifier,
@@ -235,8 +247,11 @@ private fun SearchResults(
                             book = book,
                             canDownload = true,
                             isDownloading = uiState.downloadingBookId == book.editionId,
-                            downloadsEnabled = uiState.downloadingBookId == null,
+                            isPreparingToRead = uiState.readingBookId == book.editionId,
+                            actionsEnabled = uiState.downloadingBookId == null &&
+                                uiState.readingBookId == null,
                             onOpen = { onFreeBookClick(book.editionId) },
+                            onRead = { onReadNow(book) },
                             onDownload = { onDownloadBook(book) },
                         )
                     }
@@ -265,8 +280,10 @@ private fun SearchResults(
                                 book = book,
                                 canDownload = false,
                                 isDownloading = false,
-                                downloadsEnabled = false,
+                                isPreparingToRead = false,
+                                actionsEnabled = false,
                                 onOpen = { onFreeBookClick(book.editionId) },
+                                onRead = { onFreeBookClick(book.editionId) },
                                 onDownload = { onFreeBookClick(book.editionId) },
                             )
                         }
@@ -406,8 +423,10 @@ private fun FreeBookResultCard(
     book: FreeBook,
     canDownload: Boolean,
     isDownloading: Boolean,
-    downloadsEnabled: Boolean,
+    isPreparingToRead: Boolean,
+    actionsEnabled: Boolean,
     onOpen: () -> Unit,
+    onRead: () -> Unit,
     onDownload: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -457,19 +476,48 @@ private fun FreeBookResultCard(
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                Button(
-                    onClick = if (canDownload) onDownload else onOpen,
-                    enabled = !canDownload || downloadsEnabled,
-                ) {
-                    Text(
-                        stringResource(
-                            when {
-                                isDownloading -> R.string.downloading_book
-                                canDownload -> R.string.download_to_shelf
-                                else -> R.string.more_details
-                            },
-                        ),
-                    )
+                if (canDownload) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        OutlinedButton(
+                            onClick = onRead,
+                            enabled = actionsEnabled,
+                            modifier = Modifier.weight(1f),
+                        ) {
+                            Text(
+                                text = stringResource(
+                                    if (isPreparingToRead) {
+                                        R.string.opening_for_reading
+                                    } else {
+                                        R.string.read_now
+                                    },
+                                ),
+                                maxLines = 1,
+                            )
+                        }
+                        Button(
+                            onClick = onDownload,
+                            enabled = actionsEnabled,
+                            modifier = Modifier.weight(1f),
+                        ) {
+                            Text(
+                                text = stringResource(
+                                    if (isDownloading) {
+                                        R.string.downloading_book
+                                    } else {
+                                        R.string.download_to_shelf
+                                    },
+                                ),
+                                maxLines = 1,
+                            )
+                        }
+                    }
+                } else {
+                    Button(onClick = onOpen) {
+                        Text(stringResource(R.string.more_details))
+                    }
                 }
             }
         }

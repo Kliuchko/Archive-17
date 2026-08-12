@@ -132,6 +132,8 @@
     <string name="free_source">Open Library · Internet Archive</string>
     <string name="regional_rights_notice">Доступ отмечен источником как открытый. Права на конкретное издание могут зависеть от страны.</string>
     <string name="download_to_shelf">На Полку</string>
+    <string name="read_now">Читать сейчас</string>
+    <string name="opening_for_reading">Открываем…</string>
     <string name="downloading_book">Загружаем…</string>
     <string name="checking_epub">Проверяем EPUB…</string>
     <string name="catalog_loading_books">Подбираем книги…</string>

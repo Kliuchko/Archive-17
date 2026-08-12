@@ -2,6 +2,7 @@ package com.kliuchko.archive17.presentation.search
 
 import com.kliuchko.archive17.domain.model.FreeBook
 import com.kliuchko.archive17.domain.model.Work
+import com.kliuchko.archive17.domain.model.TemporaryBook
 
 enum class CatalogMode {
     FREE,
@@ -21,7 +22,9 @@ data class SearchUiState(
     val selectedMode: CatalogMode = CatalogMode.FREE,
     val bookLanguageCode: String = "eng",
     val downloadingBookId: String? = null,
+    val readingBookId: String? = null,
     val downloadedBookId: String? = null,
+    val temporaryBook: TemporaryBook? = null,
     val errorMessage: String? = null,
     val actionMessage: String? = null,
     val hasSearched: Boolean = false,

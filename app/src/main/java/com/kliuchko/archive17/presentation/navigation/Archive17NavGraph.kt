@@ -110,6 +110,9 @@ fun Archive17App(
                     onFreeBookReady = { bookId ->
                         navController.navigate(Archive17Destination.LocalDetails.createRoute(bookId))
                     },
+                    onTemporaryBookReady = { book ->
+                        context.startActivity(EpubReaderActivity.createTemporaryIntent(context, book))
+                    },
                 )
             }
 
@@ -129,6 +132,9 @@ fun Archive17App(
                     onBackClick = navController::popBackStack,
                     onBookReady = { bookId ->
                         navController.navigate(Archive17Destination.LocalDetails.createRoute(bookId))
+                    },
+                    onTemporaryBookReady = { book ->
+                        context.startActivity(EpubReaderActivity.createTemporaryIntent(context, book))
                     },
                 )
             }

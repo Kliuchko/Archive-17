@@ -39,7 +39,9 @@ class FreeBookDetailsViewModel(
 
     fun downloadBook() {
         val book = _uiState.value.details?.book ?: return
-        if (_uiState.value.isDownloading || !book.isDownloadable) return
+        if (_uiState.value.isDownloading || _uiState.value.isPreparingToRead || !book.isDownloadable) {
+            return
+        }
 
         viewModelScope.launch {
             _uiState.update {
@@ -64,5 +66,33 @@ class FreeBookDetailsViewModel(
 
     fun onDownloadedBookHandled() {
         _uiState.update { it.copy(downloadedBookId = null) }
+    }
+
+    fun readNow() {
+        val book = _uiState.value.details?.book ?: return
+        if (_uiState.value.isDownloading || _uiState.value.isPreparingToRead || !book.isDownloadable) {
+            return
+        }
+
+        viewModelScope.launch {
+            _uiState.update {
+                it.copy(isPreparingToRead = true, errorMessage = null, message = null)
+            }
+            when (val result = repository.downloadForReading(book)) {
+                is RepositoryResult.Success -> _uiState.update {
+                    it.copy(isPreparingToRead = false, temporaryBook = result.data)
+                }
+                is RepositoryResult.Cached -> _uiState.update {
+                    it.copy(isPreparingToRead = false, message = result.message)
+                }
+                is RepositoryResult.Error -> _uiState.update {
+                    it.copy(isPreparingToRead = false, errorMessage = result.message)
+                }
+            }
+        }
+    }
+
+    fun onTemporaryBookHandled() {
+        _uiState.update { it.copy(temporaryBook = null) }
     }
 }

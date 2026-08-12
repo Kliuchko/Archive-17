@@ -34,6 +34,7 @@ import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import com.kliuchko.archive17.R
 import com.kliuchko.archive17.data.reader.ReadiumService
+import com.kliuchko.archive17.domain.model.TemporaryBook
 import com.kliuchko.archive17.domain.repository.LocalBookRepository
 import com.kliuchko.archive17.presentation.theme.Archive17Theme
 import java.io.File
@@ -68,24 +69,35 @@ class EpubReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener {
         createContent()
 
         val bookId = intent.getStringExtra(EXTRA_BOOK_ID)
-        if (bookId == null) {
+        val temporaryEditionId = intent.getStringExtra(EXTRA_TEMPORARY_EDITION_ID)
+        if (bookId == null && temporaryEditionId == null) {
             finish()
             return
         }
 
         lifecycleScope.launch {
-            val book = localBookRepository.getLocalBook(bookId)
-            if (book == null || !File(book.filePath).exists()) {
+            val readerBook = if (bookId != null) {
+                localBookRepository.getLocalBook(bookId)?.let { book ->
+                    ReaderBook(
+                        title = book.title,
+                        file = File(book.filePath),
+                        progressionJson = book.progressionJson,
+                    )
+                }
+            } else {
+                resolveTemporaryBook(temporaryEditionId.orEmpty())
+            }
+            if (readerBook == null || !readerBook.file.exists()) {
                 showTitle(getString(R.string.book_unavailable))
                 return@launch
             }
 
             try {
-                showTitle(book.title)
-                val publication = readiumService.open(File(book.filePath))
+                showTitle(readerBook.title)
+                val publication = readiumService.open(readerBook.file)
                 openedPublication = publication
                 totalPositions = runCatching { publication.positions().size }.getOrDefault(0)
-                val initialLocator = book.progressionJson?.let {
+                val initialLocator = readerBook.progressionJson?.let {
                     runCatching { Locator.fromJSON(JSONObject(it)) }.getOrNull()
                 }
                 val factory = EpubNavigatorFactory(publication).createFragmentFactory(
@@ -105,7 +117,7 @@ class EpubReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener {
                 navigator = supportFragmentManager.findFragmentByTag(NAVIGATOR_TAG)
                     as EpubNavigatorFragment
                 navigator?.currentLocator?.value?.let(::updatePageLabel)
-                observeProgression(bookId)
+                observeProgression(bookId, temporaryEditionId)
             } catch (_: Throwable) {
                 showTitle(getString(R.string.open_book_failed))
             }
@@ -126,18 +138,46 @@ class EpubReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener {
         openedPublication = null
     }
 
-    private fun observeProgression(bookId: String) {
+    private fun observeProgression(bookId: String?, temporaryEditionId: String?) {
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.RESUMED) {
                 navigator?.currentLocator
                     ?.onEach(::updatePageLabel)
                     ?.debounce(500)
                     ?.collect { locator ->
-                        localBookRepository.saveProgression(bookId, locator.toJSON().toString())
+                        val progression = locator.toJSON().toString()
+                        when {
+                            bookId != null -> localBookRepository.saveProgression(bookId, progression)
+                            temporaryEditionId != null -> temporaryProgressionPreferences()
+                                .edit()
+                                .putString(temporaryEditionId, progression)
+                                .apply()
+                        }
                     }
             }
         }
     }
+
+    private fun resolveTemporaryBook(editionId: String): ReaderBook? {
+        if (editionId.isBlank()) return null
+        val title = intent.getStringExtra(EXTRA_TEMPORARY_TITLE)?.takeIf(String::isNotBlank)
+            ?: return null
+        val path = intent.getStringExtra(EXTRA_TEMPORARY_FILE_PATH) ?: return null
+        val cacheRoot = File(cacheDir, TEMPORARY_READING_DIRECTORY)
+        val file = runCatching { File(path).canonicalFile }.getOrNull() ?: return null
+        val trustedRoot = runCatching { cacheRoot.canonicalFile }.getOrNull() ?: return null
+        if (file.parentFile != trustedRoot || !file.isFile) return null
+        return ReaderBook(
+            title = title,
+            file = file,
+            progressionJson = temporaryProgressionPreferences().getString(editionId, null),
+        )
+    }
+
+    private fun temporaryProgressionPreferences() = getSharedPreferences(
+        TEMPORARY_PROGRESSION_PREFERENCES,
+        MODE_PRIVATE,
+    )
 
     private fun createContent() {
         val root = LinearLayout(this).apply {
@@ -246,9 +286,28 @@ class EpubReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener {
 
     companion object {
         private const val EXTRA_BOOK_ID = "book_id"
+        private const val EXTRA_TEMPORARY_EDITION_ID = "temporary_edition_id"
+        private const val EXTRA_TEMPORARY_TITLE = "temporary_title"
+        private const val EXTRA_TEMPORARY_FILE_PATH = "temporary_file_path"
         private const val NAVIGATOR_TAG = "epub_navigator"
+        private const val TEMPORARY_READING_DIRECTORY = "temporary-reading"
+        private const val TEMPORARY_PROGRESSION_PREFERENCES = "temporary_reader_progress"
 
         fun createIntent(context: android.content.Context, bookId: String): Intent =
             Intent(context, EpubReaderActivity::class.java).putExtra(EXTRA_BOOK_ID, bookId)
+
+        fun createTemporaryIntent(
+            context: android.content.Context,
+            book: TemporaryBook,
+        ): Intent = Intent(context, EpubReaderActivity::class.java)
+            .putExtra(EXTRA_TEMPORARY_EDITION_ID, book.editionId)
+            .putExtra(EXTRA_TEMPORARY_TITLE, book.title)
+            .putExtra(EXTRA_TEMPORARY_FILE_PATH, book.filePath)
     }
+
+    private data class ReaderBook(
+        val title: String,
+        val file: File,
+        val progressionJson: String?,
+    )
 }

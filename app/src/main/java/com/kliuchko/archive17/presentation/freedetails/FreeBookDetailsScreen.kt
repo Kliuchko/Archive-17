@@ -26,6 +26,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.kliuchko.archive17.R
+import com.kliuchko.archive17.domain.model.TemporaryBook
 import com.kliuchko.archive17.presentation.components.FreeBookCover
 import org.koin.androidx.compose.koinViewModel
 import org.koin.core.parameter.parametersOf
@@ -35,6 +36,7 @@ fun FreeBookDetailsScreen(
     editionId: String,
     onBackClick: () -> Unit,
     onBookReady: (String) -> Unit,
+    onTemporaryBookReady: (TemporaryBook) -> Unit,
     modifier: Modifier = Modifier,
     viewModel: FreeBookDetailsViewModel = koinViewModel(parameters = { parametersOf(editionId) }),
 ) {
@@ -45,6 +47,13 @@ fun FreeBookDetailsScreen(
         uiState.downloadedBookId?.let { bookId ->
             onBookReady(bookId)
             viewModel.onDownloadedBookHandled()
+        }
+    }
+
+    LaunchedEffect(uiState.temporaryBook) {
+        uiState.temporaryBook?.let { book ->
+            onTemporaryBookReady(book)
+            viewModel.onTemporaryBookHandled()
         }
     }
 
@@ -146,8 +155,23 @@ fun FreeBookDetailsScreen(
 
                 if (book.isDownloadable) {
                     Button(
+                        onClick = viewModel::readNow,
+                        enabled = !uiState.isDownloading && !uiState.isPreparingToRead,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text(
+                            stringResource(
+                                if (uiState.isPreparingToRead) {
+                                    R.string.opening_for_reading
+                                } else {
+                                    R.string.read_now
+                                },
+                            ),
+                        )
+                    }
+                    OutlinedButton(
                         onClick = viewModel::downloadBook,
-                        enabled = !uiState.isDownloading,
+                        enabled = !uiState.isDownloading && !uiState.isPreparingToRead,
                         modifier = Modifier.fillMaxWidth(),
                     ) {
                         Text(

@@ -3,6 +3,7 @@ package com.kliuchko.archive17.domain.repository
 import com.kliuchko.archive17.domain.model.FreeBook
 import com.kliuchko.archive17.domain.model.FreeBookDetails
 import com.kliuchko.archive17.domain.model.LocalBook
+import com.kliuchko.archive17.domain.model.TemporaryBook
 
 interface FreeBookRepository {
     suspend fun searchBooks(
@@ -19,4 +20,6 @@ interface FreeBookRepository {
     suspend fun getBookDetails(editionId: String): RepositoryResult<FreeBookDetails>
 
     suspend fun downloadToShelf(book: FreeBook): RepositoryResult<LocalBook>
+
+    suspend fun downloadForReading(book: FreeBook): RepositoryResult<TemporaryBook>
 }

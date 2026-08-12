@@ -132,6 +132,8 @@
     <string name="free_source">Open Library · Internet Archive</string>
     <string name="regional_rights_notice">The source marks this edition as openly accessible. Rights for a specific edition may depend on the country.</string>
     <string name="download_to_shelf">Add to Shelf</string>
+    <string name="read_now">Read now</string>
+    <string name="opening_for_reading">Opening…</string>
     <string name="downloading_book">Downloading…</string>
     <string name="checking_epub">Checking EPUB…</string>
     <string name="catalog_loading_books">Finding books…</string>
