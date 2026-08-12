@@ -7,7 +7,7 @@ import com.kliuchko.archive17.domain.model.WorkDetails
 import kotlinx.coroutines.flow.Flow
 
 interface BookRepository {
-    suspend fun searchBooks(query: String): RepositoryResult<List<Work>>
+    suspend fun searchBooks(query: String, page: Int = 1): RepositoryResult<List<Work>>
 
     fun observeWorkDetails(workId: String): Flow<WorkDetails>
 

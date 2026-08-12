@@ -12,7 +12,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -26,6 +28,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -39,6 +42,7 @@ import com.kliuchko.archive17.presentation.components.ArchiveBrand
 import com.kliuchko.archive17.presentation.components.BookCover
 import com.kliuchko.archive17.presentation.components.EmptyMessage
 import com.kliuchko.archive17.presentation.components.FreeBookCover
+import kotlinx.coroutines.flow.distinctUntilChanged
 import org.koin.androidx.compose.koinViewModel
 
 @Composable
@@ -139,6 +143,8 @@ fun SearchScreen(
                 onBookClick = onBookClick,
                 onFreeBookClick = onFreeBookClick,
                 onDownloadBook = viewModel::downloadBook,
+                onLoadNextPage = viewModel::loadNextPage,
+                onRetryNextPage = viewModel::retryNextPage,
                 modifier = Modifier.fillMaxSize(),
             )
         }
@@ -151,6 +157,8 @@ private fun SearchResults(
     onBookClick: (String) -> Unit,
     onFreeBookClick: (String) -> Unit,
     onDownloadBook: (FreeBook) -> Unit,
+    onLoadNextPage: () -> Unit,
+    onRetryNextPage: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     when {
@@ -201,8 +209,15 @@ private fun SearchResults(
         }
 
         uiState.freeBooks.isNotEmpty() || uiState.otherFreeBooks.isNotEmpty() -> {
+            val listState = rememberLazyListState()
+            LoadNextPageEffect(
+                listState = listState,
+                enabled = uiState.canLoadMore && !uiState.isLoadingNextPage,
+                onLoadNextPage = onLoadNextPage,
+            )
             Box(modifier = modifier) {
                 LazyColumn(
+                    state = listState,
                     modifier = Modifier.fillMaxSize(),
                     contentPadding = PaddingValues(top = 6.dp, bottom = 24.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp),
@@ -256,6 +271,15 @@ private fun SearchResults(
                             )
                         }
                     }
+                    if (uiState.isLoadingNextPage || uiState.nextPageError != null) {
+                        item(key = "free-catalog-pagination") {
+                            CatalogPaginationFooter(
+                                isLoading = uiState.isLoadingNextPage,
+                                hasError = uiState.nextPageError != null,
+                                onRetry = onRetryNextPage,
+                            )
+                        }
+                    }
                 }
                 if (uiState.isLoading || uiState.isCheckingFreeBooks) {
                     LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
@@ -264,8 +288,15 @@ private fun SearchResults(
         }
 
         uiState.books.isNotEmpty() -> {
+            val listState = rememberLazyListState()
+            LoadNextPageEffect(
+                listState = listState,
+                enabled = uiState.canLoadMore && !uiState.isLoadingNextPage,
+                onLoadNextPage = onLoadNextPage,
+            )
             Box(modifier = modifier) {
                 LazyColumn(
+                    state = listState,
                     modifier = Modifier.fillMaxSize(),
                     contentPadding = PaddingValues(top = 6.dp, bottom = 24.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp),
@@ -284,6 +315,15 @@ private fun SearchResults(
                             onClick = { onBookClick(work.id) },
                         )
                     }
+                    if (uiState.isLoadingNextPage || uiState.nextPageError != null) {
+                        item(key = "all-catalog-pagination") {
+                            CatalogPaginationFooter(
+                                isLoading = uiState.isLoadingNextPage,
+                                hasError = uiState.nextPageError != null,
+                                onRetry = onRetryNextPage,
+                            )
+                        }
+                    }
                 }
                 if (uiState.isLoading) {
                     LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
@@ -293,6 +333,70 @@ private fun SearchResults(
 
         else -> {
             CatalogWelcome(mode = uiState.selectedMode, modifier = modifier)
+        }
+    }
+}
+
+@Composable
+private fun LoadNextPageEffect(
+    listState: LazyListState,
+    enabled: Boolean,
+    onLoadNextPage: () -> Unit,
+) {
+    LaunchedEffect(listState, enabled) {
+        snapshotFlow {
+            val layoutInfo = listState.layoutInfo
+            val lastVisibleIndex = layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: -1
+            enabled &&
+                layoutInfo.totalItemsCount > 0 &&
+                lastVisibleIndex >= layoutInfo.totalItemsCount - LOAD_MORE_THRESHOLD
+        }
+            .distinctUntilChanged()
+            .collect { shouldLoad ->
+                if (shouldLoad) onLoadNextPage()
+            }
+    }
+}
+
+@Composable
+private fun CatalogPaginationFooter(
+    isLoading: Boolean,
+    hasError: Boolean,
+    onRetry: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(vertical = 14.dp),
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        when {
+            isLoading -> {
+                CircularProgressIndicator(modifier = Modifier.width(22.dp))
+                Text(
+                    text = stringResource(R.string.catalog_loading_more),
+                    modifier = Modifier.padding(start = 10.dp),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            hasError -> {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    Text(
+                        text = stringResource(R.string.catalog_next_page_error),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Button(onClick = onRetry) {
+                        Text(stringResource(R.string.retry))
+                    }
+                }
+            }
         }
     }
 }
@@ -548,3 +652,5 @@ private fun Work.metadataLine(): String {
         .joinToString(" · ")
         .ifBlank { stringResource(R.string.edition_details_pending) }
 }
+
+private const val LOAD_MORE_THRESHOLD = 4

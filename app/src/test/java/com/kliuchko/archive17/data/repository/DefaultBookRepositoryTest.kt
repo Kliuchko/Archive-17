@@ -73,6 +73,13 @@ class DefaultBookRepositoryTest {
     }
 
     @Test
+    fun `search requests the selected catalog page`() = runBlocking {
+        repository.searchBooks("fiction", page = 4)
+
+        assertEquals(4, api.lastSearchPage)
+    }
+
+    @Test
     fun `refresh details updates cached work`() = runBlocking {
         workDao.upsertWork(sampleWork(lastUpdatedAt = 10L).toEntity(now = 10L))
         api.workResponse = OpenLibraryWorkDto(
@@ -202,13 +209,16 @@ private class FakeOpenLibraryApi : OpenLibraryApi {
     var searchError: Throwable? = null
     var workError: Throwable? = null
     var searchCallCount = 0
+    var lastSearchPage = 1
 
     override suspend fun searchBooks(
         query: String,
         fields: String,
         limit: Int,
+        page: Int,
     ): OpenLibrarySearchResponseDto {
         searchCallCount += 1
+        lastSearchPage = page
         searchError?.let { throw it }
         return searchResponse
     }

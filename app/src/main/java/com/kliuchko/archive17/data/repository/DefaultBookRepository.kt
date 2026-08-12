@@ -26,7 +26,7 @@ class DefaultBookRepository(
     private val timeProvider: TimeProvider,
     private val cacheFreshnessMillis: Long = DEFAULT_CACHE_FRESHNESS_MILLIS,
 ) : BookRepository {
-    override suspend fun searchBooks(query: String): RepositoryResult<List<Work>> {
+    override suspend fun searchBooks(query: String, page: Int): RepositoryResult<List<Work>> {
         val normalizedQuery = query.trim()
         if (normalizedQuery.length < MIN_SEARCH_QUERY_LENGTH) {
             return RepositoryResult.Success(emptyList())
@@ -36,7 +36,7 @@ class DefaultBookRepository(
             errorMessage = "Unable to search books.",
         ) {
             val now = timeProvider.currentTimeMillis()
-            val works = api.searchBooks(normalizedQuery)
+            val works = api.searchBooks(normalizedQuery, page = page.coerceAtLeast(1))
                 .toDomain()
                 .map { it.copy(lastUpdatedAt = now) }
 

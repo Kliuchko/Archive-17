@@ -1,5 +1,6 @@
 package com.kliuchko.archive17.presentation.search
 
+import com.kliuchko.archive17.domain.model.FreeBook
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -50,4 +51,28 @@ class SearchUiStateTest {
         assertTrue(state.isLoading)
         assertFalse(state.showEmptyState)
     }
+
+    @Test
+    fun `keeps catalog visible when next page fails`() {
+        val state = SearchUiState(
+            isLoading = false,
+            hasSearched = true,
+            freeBooks = listOf(sampleFreeBook()),
+            nextPageError = "Offline",
+            canLoadMore = true,
+        )
+
+        assertFalse(state.showEmptyState)
+        assertTrue(state.canLoadMore)
+    }
+
+    private fun sampleFreeBook() = FreeBook(
+        workId = "work",
+        editionId = "edition",
+        title = "Book",
+        authors = listOf("Author"),
+        coverId = null,
+        firstPublishYear = 1900,
+        languageCode = "eng",
+    )
 }

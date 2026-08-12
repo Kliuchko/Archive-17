@@ -135,6 +135,8 @@
     <string name="downloading_book">Загружаем…</string>
     <string name="checking_epub">Проверяем EPUB…</string>
     <string name="catalog_loading_books">Подбираем книги…</string>
+    <string name="catalog_loading_more">Открываем следующий стеллаж…</string>
+    <string name="catalog_next_page_error">Следующий стеллаж пока не открылся.</string>
     <string name="free_catalog_empty">Открытых EPUB на выбранном языке не найдено</string>
     <string name="free_catalog_empty_body">Попробуйте другое название, автора или измените предпочтительный язык книг в Профиле.</string>
     <string name="catalog_error_body">Проверьте соединение и попробуйте ещё раз.</string>

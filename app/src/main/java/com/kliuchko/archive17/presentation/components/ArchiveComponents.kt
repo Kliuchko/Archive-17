@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -15,6 +16,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -22,12 +24,14 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
+import coil.request.ImageRequest
 import com.kliuchko.archive17.data.networking.CoverSize
 import com.kliuchko.archive17.data.networking.CoverUrlBuilder
 import com.kliuchko.archive17.domain.model.Work
@@ -141,14 +145,13 @@ fun BookCover(
             height = height,
         )
     } else {
-        AsyncImage(
+        StableBookCover(
             model = coverUrl,
-            contentDescription = work.title,
-            modifier = modifier
-                .size(width = width, height = height)
-                .clip(shape)
-                .background(MaterialTheme.colorScheme.tertiary),
-            contentScale = ContentScale.Crop,
+            title = work.title,
+            modifier = modifier,
+            width = width,
+            height = height,
+            shape = shape,
         )
     }
 }
@@ -165,14 +168,13 @@ fun FreeBookCover(
     if (coverUrl == null) {
         GeneratedCover(book.title, modifier, width, height)
     } else {
-        AsyncImage(
+        StableBookCover(
             model = coverUrl,
-            contentDescription = book.title,
-            modifier = modifier
-                .size(width = width, height = height)
-                .clip(shape)
-                .background(MaterialTheme.colorScheme.tertiary),
-            contentScale = ContentScale.Crop,
+            title = book.title,
+            modifier = modifier,
+            width = width,
+            height = height,
+            shape = shape,
         )
     }
 }
@@ -194,13 +196,48 @@ fun LocalBookCover(
         )
     } else {
         val shape = RoundedCornerShape(topStart = 5.dp, topEnd = 9.dp, bottomEnd = 9.dp, bottomStart = 5.dp)
-        AsyncImage(
+        StableBookCover(
             model = File(coverPath),
-            contentDescription = book.title,
-            modifier = modifier
-                .size(width = width, height = height)
-                .clip(shape)
-                .background(MaterialTheme.colorScheme.tertiary),
+            title = book.title,
+            modifier = modifier,
+            width = width,
+            height = height,
+            shape = shape,
+        )
+    }
+}
+
+@Composable
+private fun StableBookCover(
+    model: Any,
+    title: String,
+    width: Dp,
+    height: Dp,
+    shape: RoundedCornerShape,
+    modifier: Modifier = Modifier,
+) {
+    val context = LocalContext.current
+    val request = remember(model) {
+        ImageRequest.Builder(context)
+            .data(model)
+            .crossfade(180)
+            .build()
+    }
+    Box(
+        modifier = modifier
+            .size(width = width, height = height)
+            .clip(shape)
+            .background(MaterialTheme.colorScheme.tertiary),
+    ) {
+        GeneratedCover(
+            title = title,
+            width = width,
+            height = height,
+        )
+        AsyncImage(
+            model = request,
+            contentDescription = title,
+            modifier = Modifier.fillMaxSize(),
             contentScale = ContentScale.Crop,
         )
     }

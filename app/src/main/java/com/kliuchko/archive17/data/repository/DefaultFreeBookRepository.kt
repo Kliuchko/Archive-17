@@ -69,6 +69,17 @@ class DefaultFreeBookRepository(
                 searchPrimarySourceBooks(normalizedQuery, languageCode, page)
             }.getOrDefault(emptyList())
             val cachedBooks = catalogCache.read(languageCode, page)
+            if (primarySourceBooks.isEmpty() && cachedBooks.isEmpty() && page > 1) {
+                val (remoteBooks, remoteError) = fetchBooksSafely {
+                    fetchOpenLibraryBooks("", languageCode, page)
+                }
+                if (remoteError != null) {
+                    return RepositoryResult.Error("Не удалось загрузить следующую страницу книг.")
+                }
+                catalogCache.write(languageCode, page, remoteBooks, System.currentTimeMillis())
+                remoteBooks.forEach { book -> booksByEditionId[book.editionId] = book }
+                return RepositoryResult.Success(remoteBooks)
+            }
             refreshStarterCatalog(languageCode, page)
             val books = interleaveBooks(primarySourceBooks, cachedBooks)
                 .distinctBy(FreeBook::catalogTitleKey)

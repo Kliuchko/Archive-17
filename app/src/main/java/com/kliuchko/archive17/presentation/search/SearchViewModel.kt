@@ -5,16 +5,13 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.kliuchko.archive17.domain.model.BookLanguage
 import com.kliuchko.archive17.domain.model.FreeBook
-import com.kliuchko.archive17.domain.model.FreeBookSource
 import com.kliuchko.archive17.domain.model.Work
 import com.kliuchko.archive17.domain.repository.BookRepository
 import com.kliuchko.archive17.domain.repository.FreeBookRepository
 import com.kliuchko.archive17.domain.repository.LanguageSettingsRepository
 import com.kliuchko.archive17.domain.repository.RepositoryResult
 import kotlinx.coroutines.FlowPreview
-import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
-import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -35,6 +32,9 @@ class SearchViewModel(
     private val query = MutableStateFlow("")
     private val selectedMode = MutableStateFlow(CatalogMode.FREE)
     private val _uiState = MutableStateFlow(SearchUiState())
+    private var activeRequest: SearchRequest? = null
+    private var nextPage = 2
+    private var paginationJob: Job? = null
 
     val uiState: StateFlow<SearchUiState> = _uiState.asStateFlow()
 
@@ -50,6 +50,8 @@ class SearchViewModel(
     }
 
     fun onQueryChange(value: String) {
+        paginationJob?.cancel()
+        activeRequest = null
         query.value = value
         val normalizedLength = value.trim().length
         _uiState.update {
@@ -57,6 +59,9 @@ class SearchViewModel(
                 query = value,
                 isLoading = value.isBlank() || normalizedLength >= SearchUiState.MIN_QUERY_LENGTH,
                 isCheckingFreeBooks = false,
+                isLoadingNextPage = false,
+                canLoadMore = false,
+                nextPageError = null,
                 errorMessage = null,
                 actionMessage = null,
                 hasSearched = false,
@@ -80,6 +85,9 @@ class SearchViewModel(
     }
 
     fun onModeSelected(mode: CatalogMode) {
+        if (selectedMode.value == mode) return
+        paginationJob?.cancel()
+        activeRequest = null
         selectedMode.value = mode
         _uiState.update {
             it.copy(
@@ -87,6 +95,9 @@ class SearchViewModel(
                 isLoading = it.query.isBlank() ||
                     it.query.trim().length >= SearchUiState.MIN_QUERY_LENGTH,
                 isCheckingFreeBooks = false,
+                isLoadingNextPage = false,
+                canLoadMore = false,
+                nextPageError = null,
                 books = emptyList(),
                 freeBooks = emptyList(),
                 otherFreeBooks = emptyList(),
@@ -127,13 +138,43 @@ class SearchViewModel(
         _uiState.update { it.copy(downloadedBookId = null) }
     }
 
+    fun loadNextPage() {
+        val request = activeRequest ?: return
+        val state = _uiState.value
+        if (
+            state.isLoading ||
+            state.isCheckingFreeBooks ||
+            state.isLoadingNextPage ||
+            !state.canLoadMore
+        ) {
+            return
+        }
+
+        val page = nextPage
+        paginationJob = viewModelScope.launch {
+            _uiState.update { it.copy(isLoadingNextPage = true, nextPageError = null) }
+            when (request.mode) {
+                CatalogMode.FREE -> loadNextFreeBookPage(request, page)
+                CatalogMode.ALL -> loadNextAllBooksPage(request, page)
+            }
+        }
+    }
+
+    fun retryNextPage() = loadNextPage()
+
     private suspend fun search(request: SearchRequest) {
+        paginationJob?.cancel()
+        activeRequest = null
+        nextPage = 2
         val normalizedQuery = request.query.trim()
         if (normalizedQuery.isNotEmpty() && normalizedQuery.length < SearchUiState.MIN_QUERY_LENGTH) {
             _uiState.update {
                 it.copy(
                     isLoading = false,
                     isCheckingFreeBooks = false,
+                    isLoadingNextPage = false,
+                    canLoadMore = false,
+                    nextPageError = null,
                     books = emptyList(),
                     freeBooks = emptyList(),
                     otherFreeBooks = emptyList(),
@@ -151,8 +192,14 @@ class SearchViewModel(
             it.copy(
                 isLoading = true,
                 isCheckingFreeBooks = false,
+                isLoadingNextPage = false,
+                canLoadMore = false,
+                nextPageError = null,
                 errorMessage = null,
                 actionMessage = null,
+                books = emptyList(),
+                freeBooks = emptyList(),
+                otherFreeBooks = emptyList(),
                 selectedMode = request.mode,
                 bookLanguageCode = request.languageCode,
             )
@@ -160,7 +207,7 @@ class SearchViewModel(
 
         when (request.mode) {
             CatalogMode.FREE -> searchFreeBooks(normalizedQuery, request.languageCode)
-            CatalogMode.ALL -> searchAllBooks(normalizedQuery)
+            CatalogMode.ALL -> searchAllBooks(request.copy(query = normalizedQuery))
         }
     }
 
@@ -168,11 +215,17 @@ class SearchViewModel(
         when (val result = freeBookRepository.searchBooks(query, languageCode)) {
             is RepositoryResult.Success -> {
                 showFreeBookCandidates(result.data, languageCode)
-                fillFreeBookCatalog(query, languageCode)
+                activatePagination(
+                    request = SearchRequest(query, CatalogMode.FREE, languageCode),
+                    canLoadMore = result.data.isNotEmpty(),
+                )
             }
             is RepositoryResult.Cached -> {
                 showFreeBookCandidates(result.data, languageCode, result.message)
-                fillFreeBookCatalog(query, languageCode)
+                activatePagination(
+                    request = SearchRequest(query, CatalogMode.FREE, languageCode),
+                    canLoadMore = result.data.isNotEmpty(),
+                )
             }
             is RepositoryResult.Error -> showSearchError(result.message)
         }
@@ -199,6 +252,7 @@ class SearchViewModel(
                 it.copy(
                     isLoading = false,
                     isCheckingFreeBooks = false,
+                    canLoadMore = false,
                     freeBooks = emptyList(),
                     otherFreeBooks = emptyList(),
                 )
@@ -243,54 +297,29 @@ class SearchViewModel(
         }
     }
 
-    private suspend fun fillFreeBookCatalog(query: String, languageCode: String) {
-        if (_uiState.value.freeBooks.size >= CATALOG_TARGET_SIZE) return
-
-        _uiState.update { it.copy(isCheckingFreeBooks = true) }
-        val additionalPages = coroutineScope {
-            (2..MAX_CATALOG_PAGES).map { page ->
-                async { loadClassifiedFreeBookPage(query, languageCode, page) }
-            }.awaitAll()
-        }
-        _uiState.update { state ->
-            val verified = (state.freeBooks + additionalPages.flatMap { it.verified })
-                .sortedByDescending { it.source != FreeBookSource.OPEN_LIBRARY }
-                .distinctBy(FreeBook::catalogTitleKey)
-                .take(CATALOG_TARGET_SIZE)
-            val verifiedIds = verified.mapTo(mutableSetOf(), FreeBook::editionId)
-            val verifiedTitles = verified.mapTo(mutableSetOf(), FreeBook::catalogTitleKey)
-            val other = (state.otherFreeBooks + additionalPages.flatMap { it.other })
-                .distinctBy(FreeBook::catalogTitleKey)
-                .filterNot { it.editionId in verifiedIds }
-                .filterNot { it.catalogTitleKey in verifiedTitles }
-                .take(OTHER_CATALOG_SIZE)
-            state.copy(
-                isCheckingFreeBooks = false,
-                freeBooks = verified,
-                otherFreeBooks = other,
-            )
-        }
-    }
-
     private suspend fun loadClassifiedFreeBookPage(
         query: String,
         languageCode: String,
         page: Int,
-    ): ClassifiedFreeBooks {
+    ): FreeCatalogPageResult {
         val candidates = when (
             val searchResult = freeBookRepository.searchBooks(query, languageCode, page)
         ) {
             is RepositoryResult.Success -> searchResult.data
             is RepositoryResult.Cached -> searchResult.data
-            is RepositoryResult.Error -> return ClassifiedFreeBooks()
+            is RepositoryResult.Error -> return FreeCatalogPageResult.Error(searchResult.message)
         }
-        return when (
+        val classified = when (
             val availability = freeBookRepository.keepDownloadableBooks(candidates, languageCode)
         ) {
             is RepositoryResult.Success -> candidates.classify(availability.data)
             is RepositoryResult.Cached -> candidates.classify(availability.data)
             is RepositoryResult.Error -> ClassifiedFreeBooks(other = candidates)
         }
+        return FreeCatalogPageResult.Success(
+            books = classified,
+            hasMore = candidates.isNotEmpty(),
+        )
     }
 
     private fun List<FreeBook>.classify(verified: List<FreeBook>): ClassifiedFreeBooks {
@@ -301,16 +330,24 @@ class SearchViewModel(
         )
     }
 
-    private suspend fun searchAllBooks(query: String) {
-        val effectiveQuery = query.ifBlank { STARTER_ALL_BOOKS_QUERY }
-        val result = repository.searchBooks(effectiveQuery)
+    private suspend fun searchAllBooks(request: SearchRequest) {
+        val effectiveQuery = request.query.ifBlank { STARTER_ALL_BOOKS_QUERY }
+        val result = repository.searchBooks(effectiveQuery, page = 1)
         when (result) {
             is RepositoryResult.Success -> {
                 showAllBooks(result.data)
+                activatePagination(
+                    request = request.copy(query = effectiveQuery),
+                    canLoadMore = result.data.isNotEmpty(),
+                )
             }
 
             is RepositoryResult.Cached -> {
                 showAllBooks(result.data, result.message)
+                activatePagination(
+                    request = request.copy(query = effectiveQuery),
+                    canLoadMore = result.data.isNotEmpty(),
+                )
             }
 
             is RepositoryResult.Error -> {
@@ -324,6 +361,7 @@ class SearchViewModel(
             it.copy(
                 isLoading = false,
                 isCheckingFreeBooks = false,
+                isLoadingNextPage = false,
                 books = books,
                 freeBooks = emptyList(),
                 otherFreeBooks = emptyList(),
@@ -339,6 +377,9 @@ class SearchViewModel(
             it.copy(
                 isLoading = false,
                 isCheckingFreeBooks = false,
+                isLoadingNextPage = false,
+                canLoadMore = false,
+                nextPageError = null,
                 books = emptyList(),
                 freeBooks = emptyList(),
                 otherFreeBooks = emptyList(),
@@ -349,12 +390,68 @@ class SearchViewModel(
         }
     }
 
+    private fun activatePagination(request: SearchRequest, canLoadMore: Boolean) {
+        activeRequest = request
+        nextPage = 2
+        _uiState.update {
+            it.copy(
+                canLoadMore = canLoadMore,
+                isLoadingNextPage = false,
+                nextPageError = null,
+            )
+        }
+    }
+
+    private suspend fun loadNextFreeBookPage(request: SearchRequest, page: Int) {
+        when (
+            val result = loadClassifiedFreeBookPage(
+                query = request.query,
+                languageCode = request.languageCode,
+                page = page,
+            )
+        ) {
+            is FreeCatalogPageResult.Success -> {
+                _uiState.update { state -> state.append(result.books, result.hasMore) }
+                if (result.hasMore) nextPage = page + 1
+            }
+            is FreeCatalogPageResult.Error -> _uiState.update {
+                it.copy(
+                    isLoadingNextPage = false,
+                    nextPageError = result.message,
+                )
+            }
+        }
+    }
+
+    private suspend fun loadNextAllBooksPage(request: SearchRequest, page: Int) {
+        when (val result = repository.searchBooks(request.query, page)) {
+            is RepositoryResult.Success -> appendAllBooksPage(result.data, page)
+            is RepositoryResult.Cached -> appendAllBooksPage(result.data, page, result.message)
+            is RepositoryResult.Error -> _uiState.update {
+                it.copy(
+                    isLoadingNextPage = false,
+                    nextPageError = result.message,
+                )
+            }
+        }
+    }
+
+    private fun appendAllBooksPage(books: List<Work>, page: Int, notice: String? = null) {
+        _uiState.update { state ->
+            state.copy(
+                books = (state.books + books).distinctBy(Work::id),
+                isLoadingNextPage = false,
+                canLoadMore = books.isNotEmpty(),
+                nextPageError = null,
+                actionMessage = notice ?: state.actionMessage,
+            )
+        }
+        if (books.isNotEmpty()) nextPage = page + 1
+    }
+
     private companion object {
         const val SEARCH_DEBOUNCE_MILLIS = 350L
         const val STARTER_ALL_BOOKS_QUERY = "subject:fiction"
-        const val CATALOG_TARGET_SIZE = 18
-        const val OTHER_CATALOG_SIZE = 20
-        const val MAX_CATALOG_PAGES = 3
     }
 
     private data class SearchRequest(
@@ -367,6 +464,35 @@ class SearchViewModel(
         val verified: List<FreeBook> = emptyList(),
         val other: List<FreeBook> = emptyList(),
     )
+
+    private sealed interface FreeCatalogPageResult {
+        data class Success(
+            val books: ClassifiedFreeBooks,
+            val hasMore: Boolean,
+        ) : FreeCatalogPageResult
+
+        data class Error(val message: String) : FreeCatalogPageResult
+    }
+
+    private fun SearchUiState.append(
+        page: ClassifiedFreeBooks,
+        hasMore: Boolean,
+    ): SearchUiState {
+        val verified = (freeBooks + page.verified).distinctBy(FreeBook::catalogTitleKey)
+        val verifiedIds = verified.mapTo(mutableSetOf(), FreeBook::editionId)
+        val verifiedTitles = verified.mapTo(mutableSetOf(), FreeBook::catalogTitleKey)
+        val other = (otherFreeBooks + page.other)
+            .distinctBy(FreeBook::catalogTitleKey)
+            .filterNot { it.editionId in verifiedIds }
+            .filterNot { it.catalogTitleKey in verifiedTitles }
+        return copy(
+            freeBooks = verified,
+            otherFreeBooks = other,
+            isLoadingNextPage = false,
+            canLoadMore = hasMore,
+            nextPageError = null,
+        )
+    }
 
     private fun BookLanguage.toCatalogCode(): String = when (this) {
         BookLanguage.RUSSIAN -> "rus"

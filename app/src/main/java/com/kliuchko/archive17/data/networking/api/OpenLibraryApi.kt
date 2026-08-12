@@ -12,6 +12,7 @@ interface OpenLibraryApi {
         @Query("q") query: String,
         @Query("fields") fields: String = SEARCH_FIELDS,
         @Query("limit") limit: Int = SEARCH_LIMIT,
+        @Query("page") page: Int = 1,
     ): OpenLibrarySearchResponseDto
 
     @GET("search.json")
