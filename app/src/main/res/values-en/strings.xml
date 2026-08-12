@@ -62,6 +62,7 @@
     <string name="search_hint">Title or author</string>
     <string name="open">Open</string>
     <string name="my_file">MY FILE</string>
+    <string name="open_collection_badge">OPEN COLLECTION</string>
     <string name="epub_offline">EPUB · available offline</string>
     <string name="read">Read</string>
     <string name="continue_book_plain">Return to the book</string>
@@ -115,4 +116,26 @@
     <string name="updating">Updating</string>
     <string name="opening_book">Opening book…</string>
     <string name="open_book_failed">Could not open the book</string>
+    <string name="catalog_free_filter">Free to read</string>
+    <string name="catalog_all_filter">All books</string>
+    <string name="catalog_book_language">Book language: %1$s</string>
+    <string name="language_italian">Italiano</string>
+    <string name="language_other">Selected language</string>
+    <string name="public_access">Open access</string>
+    <string name="free_source">Open Library · Internet Archive</string>
+    <string name="regional_rights_notice">The source marks this edition as openly accessible. Rights for a specific edition may depend on the country.</string>
+    <string name="download_to_shelf">Add to Shelf</string>
+    <string name="downloading_book">Downloading…</string>
+    <string name="checking_epub">Checking EPUB…</string>
+    <string name="catalog_loading_books">Finding books…</string>
+    <string name="free_catalog_empty">No open EPUBs found in the selected language</string>
+    <string name="free_catalog_empty_body">Try another title or author, or change the preferred book language in Profile.</string>
+    <string name="catalog_error_body">Check your connection and try again.</string>
+    <string name="free_catalog_welcome">Find a book you can read</string>
+    <string name="free_catalog_welcome_body">Archive 17 will find an open edition in the selected language, download its EPUB to the Shelf, and keep it available offline.</string>
+    <string name="source_label">Source</string>
+    <string name="public_access_details">The open-access status is provided by the source. Check the source page for the terms and rights applying to this edition.</string>
+    <string name="open_source_page">Open source page</string>
+    <string name="access_label">Access</string>
+    <string name="book_language_label">Book language</string>
 </resources>

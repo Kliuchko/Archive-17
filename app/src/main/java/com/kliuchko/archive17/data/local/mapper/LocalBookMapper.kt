@@ -15,6 +15,10 @@ fun LocalBookEntity.toDomain(): LocalBook = LocalBook(
     readingStatus = readingStatus,
     addedAt = addedAt,
     updatedAt = updatedAt,
+    languageCode = languageCode,
+    sourceName = sourceName,
+    sourceUrl = sourceUrl,
+    isPublicAccess = isPublicAccess,
 )
 
 fun LocalBook.toEntity(): LocalBookEntity = LocalBookEntity(
@@ -29,4 +33,8 @@ fun LocalBook.toEntity(): LocalBookEntity = LocalBookEntity(
     readingStatus = readingStatus,
     addedAt = addedAt,
     updatedAt = updatedAt,
+    languageCode = languageCode,
+    sourceName = sourceName,
+    sourceUrl = sourceUrl,
+    isPublicAccess = isPublicAccess,
 )

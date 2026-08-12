@@ -21,7 +21,7 @@ import com.kliuchko.archive17.data.local.entity.WorkEntity
         LibraryEntryEntity::class,
         LocalBookEntity::class,
     ],
-    version = 3,
+    version = 4,
     exportSchema = true,
 )
 @TypeConverters(Archive17TypeConverters::class)
@@ -63,6 +63,17 @@ abstract class Archive17Database : RoomDatabase() {
                 db.execSQL("ALTER TABLE local_books ADD COLUMN contentHash TEXT")
                 db.execSQL(
                     "CREATE UNIQUE INDEX IF NOT EXISTS index_local_books_contentHash ON local_books(contentHash)",
+                )
+            }
+        }
+
+        val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE local_books ADD COLUMN languageCode TEXT")
+                db.execSQL("ALTER TABLE local_books ADD COLUMN sourceName TEXT")
+                db.execSQL("ALTER TABLE local_books ADD COLUMN sourceUrl TEXT")
+                db.execSQL(
+                    "ALTER TABLE local_books ADD COLUMN isPublicAccess INTEGER NOT NULL DEFAULT 0",
                 )
             }
         }

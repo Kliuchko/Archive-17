@@ -8,17 +8,23 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.Button
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -28,18 +34,28 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.kliuchko.archive17.R
 import com.kliuchko.archive17.domain.model.Work
+import com.kliuchko.archive17.domain.model.FreeBook
 import com.kliuchko.archive17.presentation.components.ArchiveBrand
 import com.kliuchko.archive17.presentation.components.BookCover
 import com.kliuchko.archive17.presentation.components.EmptyMessage
+import com.kliuchko.archive17.presentation.components.FreeBookCover
 import org.koin.androidx.compose.koinViewModel
 
 @Composable
 fun SearchScreen(
     onBookClick: (String) -> Unit,
+    onFreeBookReady: (String) -> Unit,
     modifier: Modifier = Modifier,
     viewModel: SearchViewModel = koinViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+
+    LaunchedEffect(uiState.downloadedBookId) {
+        uiState.downloadedBookId?.let { bookId ->
+            onFreeBookReady(bookId)
+            viewModel.onDownloadedBookHandled()
+        }
+    }
 
     Column(
         modifier = modifier
@@ -76,6 +92,37 @@ fun SearchScreen(
             },
         )
 
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            FilterChip(
+                selected = uiState.selectedMode == CatalogMode.FREE,
+                onClick = { viewModel.onModeSelected(CatalogMode.FREE) },
+                label = { Text(stringResource(R.string.catalog_free_filter)) },
+            )
+            FilterChip(
+                selected = uiState.selectedMode == CatalogMode.ALL,
+                onClick = { viewModel.onModeSelected(CatalogMode.ALL) },
+                label = { Text(stringResource(R.string.catalog_all_filter)) },
+            )
+        }
+
+        if (uiState.selectedMode == CatalogMode.FREE) {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(
+                    text = stringResource(
+                        R.string.catalog_book_language,
+                        localizedLanguageName(uiState.bookLanguageCode),
+                    ),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+                Text(
+                    text = stringResource(R.string.regional_rights_notice),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -84,6 +131,7 @@ fun SearchScreen(
             SearchResults(
                 uiState = uiState,
                 onBookClick = onBookClick,
+                onDownloadBook = viewModel::downloadBook,
                 modifier = Modifier.fillMaxSize(),
             )
         }
@@ -94,23 +142,10 @@ fun SearchScreen(
 private fun SearchResults(
     uiState: SearchUiState,
     onBookClick: (String) -> Unit,
+    onDownloadBook: (FreeBook) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     when {
-        uiState.isLoading -> {
-            Box(modifier = modifier, contentAlignment = Alignment.Center) {
-                CircularProgressIndicator()
-            }
-        }
-
-        uiState.errorMessage != null -> {
-            EmptyMessage(
-                title = stringResource(R.string.catalog_unavailable),
-                body = uiState.errorMessage,
-                modifier = modifier,
-            )
-        }
-
         uiState.showMinimumQueryState -> {
             EmptyMessage(
                 title = stringResource(R.string.minimum_query_title),
@@ -119,34 +154,225 @@ private fun SearchResults(
             )
         }
 
-        uiState.showEmptyState -> {
+        uiState.errorMessage != null && uiState.books.isEmpty() && uiState.freeBooks.isEmpty() -> {
             EmptyMessage(
-                title = stringResource(R.string.nothing_found),
-                body = stringResource(R.string.nothing_found_body),
+                title = stringResource(R.string.catalog_unavailable),
+                body = uiState.errorMessage,
                 modifier = modifier,
             )
         }
 
-        uiState.books.isNotEmpty() -> {
-            LazyColumn(
+        uiState.isLoading && uiState.books.isEmpty() && uiState.freeBooks.isEmpty() -> {
+            CatalogLoadingPlaceholder(modifier = modifier)
+        }
+
+        uiState.showEmptyState -> {
+            EmptyMessage(
+                title = stringResource(
+                    if (uiState.selectedMode == CatalogMode.FREE) {
+                        R.string.free_catalog_empty
+                    } else {
+                        R.string.nothing_found
+                    },
+                ),
+                body = stringResource(
+                    if (uiState.selectedMode == CatalogMode.FREE) {
+                        R.string.free_catalog_empty_body
+                    } else {
+                        R.string.nothing_found_body
+                    },
+                ),
                 modifier = modifier,
-                contentPadding = PaddingValues(bottom = 24.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                items(
-                    items = uiState.books,
-                    key = { it.id },
-                ) { work ->
-                    SearchResultCard(
-                        work = work,
-                        onClick = { onBookClick(work.id) },
-                    )
+            )
+        }
+
+        uiState.freeBooks.isNotEmpty() -> {
+            Box(modifier = modifier) {
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(top = 6.dp, bottom = 24.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    uiState.actionMessage?.let { message ->
+                        item(key = "catalog-message") {
+                            CatalogMessage(message = message)
+                        }
+                    }
+                    items(
+                        items = uiState.freeBooks,
+                        key = { it.editionId },
+                    ) { book ->
+                        FreeBookResultCard(
+                            book = book,
+                            isDownloading = uiState.downloadingBookId == book.editionId,
+                            downloadsEnabled = uiState.downloadingBookId == null &&
+                                !uiState.isCheckingFreeBooks,
+                            isCheckingAvailability = uiState.isCheckingFreeBooks,
+                            onDownload = { onDownloadBook(book) },
+                        )
+                    }
+                }
+                if (uiState.isLoading || uiState.isCheckingFreeBooks) {
+                    LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                }
+            }
+        }
+
+        uiState.books.isNotEmpty() -> {
+            Box(modifier = modifier) {
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(top = 6.dp, bottom = 24.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    uiState.actionMessage?.let { message ->
+                        item(key = "catalog-message") {
+                            CatalogMessage(message = message)
+                        }
+                    }
+                    items(
+                        items = uiState.books,
+                        key = { it.id },
+                    ) { work ->
+                        SearchResultCard(
+                            work = work,
+                            onClick = { onBookClick(work.id) },
+                        )
+                    }
+                }
+                if (uiState.isLoading) {
+                    LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
                 }
             }
         }
 
         else -> {
-            CatalogWelcome(modifier = modifier)
+            CatalogWelcome(mode = uiState.selectedMode, modifier = modifier)
+        }
+    }
+}
+
+@Composable
+private fun FreeBookResultCard(
+    book: FreeBook,
+    isDownloading: Boolean,
+    downloadsEnabled: Boolean,
+    isCheckingAvailability: Boolean,
+    onDownload: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(15.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+    ) {
+        Row(
+            modifier = Modifier.padding(12.dp),
+            horizontalArrangement = Arrangement.spacedBy(14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            FreeBookCover(book = book)
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                Text(
+                    text = book.title,
+                    style = MaterialTheme.typography.titleMedium,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    text = book.authors.joinToString().ifBlank { stringResource(R.string.author_unknown) },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    text = "${stringResource(R.string.public_access)} · ${localizedLanguageName(book.languageCode)}",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+                Text(
+                    text = stringResource(R.string.free_source),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Button(
+                    onClick = onDownload,
+                    enabled = downloadsEnabled,
+                ) {
+                    Text(
+                        stringResource(
+                            when {
+                                isDownloading -> R.string.downloading_book
+                                isCheckingAvailability -> R.string.checking_epub
+                                else -> R.string.download_to_shelf
+                            },
+                        ),
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun CatalogMessage(
+    message: String,
+    modifier: Modifier = Modifier,
+) {
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant,
+        ),
+    ) {
+        Text(
+            text = message,
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+@Composable
+private fun CatalogLoadingPlaceholder(
+    modifier: Modifier = Modifier,
+) {
+    LazyColumn(
+        modifier = modifier,
+        contentPadding = PaddingValues(top = 6.dp, bottom = 24.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+        userScrollEnabled = false,
+    ) {
+        item {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                CircularProgressIndicator(modifier = Modifier.width(20.dp))
+                Text(
+                    text = stringResource(R.string.catalog_loading_books),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+        items(count = 4) {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(132.dp),
+                shape = RoundedCornerShape(15.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                ),
+            ) {}
         }
     }
 }
@@ -206,6 +432,7 @@ private fun SearchResultCard(
 
 @Composable
 private fun CatalogWelcome(
+    mode: CatalogMode,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -221,23 +448,43 @@ private fun CatalogWelcome(
                 verticalArrangement = Arrangement.spacedBy(6.dp),
             ) {
                 Text(
-                    text = stringResource(R.string.find_new_book),
+                    text = stringResource(
+                        if (mode == CatalogMode.FREE) R.string.free_catalog_welcome else R.string.find_new_book,
+                    ),
                     style = MaterialTheme.typography.titleLarge,
                 )
                 Text(
-                    text = stringResource(R.string.catalog_welcome_body),
+                    text = stringResource(
+                        if (mode == CatalogMode.FREE) {
+                            R.string.free_catalog_welcome_body
+                        } else {
+                            R.string.catalog_welcome_body
+                        },
+                    ),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
         }
-        Text(
-            text = stringResource(R.string.free_books_soon),
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.primary,
-        )
+        if (mode == CatalogMode.ALL) {
+            Text(
+                text = stringResource(R.string.free_books_soon),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.primary,
+            )
+        }
     }
 }
+
+@Composable
+private fun localizedLanguageName(code: String): String = stringResource(
+    when (code) {
+        "rus" -> R.string.language_russian
+        "eng" -> R.string.language_english
+        "ita" -> R.string.language_italian
+        else -> R.string.language_other
+    },
+)
 
 @Composable
 private fun Work.metadataLine(): String {

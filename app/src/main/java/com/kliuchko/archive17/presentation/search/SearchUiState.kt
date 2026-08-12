@@ -1,19 +1,36 @@
 package com.kliuchko.archive17.presentation.search
 
+import com.kliuchko.archive17.domain.model.FreeBook
 import com.kliuchko.archive17.domain.model.Work
+
+enum class CatalogMode {
+    FREE,
+    ALL,
+}
 
 data class SearchUiState(
     val query: String = "",
-    val isLoading: Boolean = false,
+    val isLoading: Boolean = true,
+    val isCheckingFreeBooks: Boolean = false,
     val books: List<Work> = emptyList(),
+    val freeBooks: List<FreeBook> = emptyList(),
+    val selectedMode: CatalogMode = CatalogMode.FREE,
+    val bookLanguageCode: String = "eng",
+    val downloadingBookId: String? = null,
+    val downloadedBookId: String? = null,
     val errorMessage: String? = null,
+    val actionMessage: String? = null,
     val hasSearched: Boolean = false,
 ) {
     val showMinimumQueryState: Boolean
         get() = query.isNotBlank() && query.trim().length < MIN_QUERY_LENGTH
 
     val showEmptyState: Boolean
-        get() = hasSearched && !isLoading && errorMessage == null && books.isEmpty()
+        get() = hasSearched &&
+            !isLoading &&
+            errorMessage == null &&
+            books.isEmpty() &&
+            freeBooks.isEmpty()
 
     companion object {
         const val MIN_QUERY_LENGTH = 2

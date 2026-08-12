@@ -26,6 +26,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -46,6 +47,7 @@ fun LocalBookDetailsScreen(
     viewModel: LocalBookDetailsViewModel = koinViewModel(parameters = { parametersOf(bookId) }),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val uriHandler = LocalUriHandler.current
     var showEditDialog by remember { mutableStateOf(false) }
     var showDeleteDialog by remember { mutableStateOf(false) }
 
@@ -67,7 +69,13 @@ fun LocalBookDetailsScreen(
         ) {
             OutlinedButton(onClick = onBackClick) { Text(stringResource(R.string.back)) }
             Text(
-                text = stringResource(R.string.my_file),
+                text = stringResource(
+                    if (uiState.book?.sourceName == null) {
+                        R.string.my_file
+                    } else {
+                        R.string.open_collection_badge
+                    },
+                ),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.primary,
             )
@@ -116,6 +124,45 @@ fun LocalBookDetailsScreen(
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
+                }
+
+                if (book.sourceName != null) {
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        BookFact(
+                            label = stringResource(R.string.source_label),
+                            value = book.sourceName,
+                        )
+                        if (book.isPublicAccess) {
+                            BookFact(
+                                label = stringResource(R.string.access_label),
+                                value = stringResource(R.string.public_access),
+                            )
+                        }
+                        book.languageCode?.let { code ->
+                            BookFact(
+                                label = stringResource(R.string.book_language_label),
+                                value = localizedBookLanguage(code),
+                            )
+                        }
+                        if (book.isPublicAccess) {
+                            Text(
+                                text = stringResource(R.string.public_access_details),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        book.sourceUrl?.let { sourceUrl ->
+                            TextButton(
+                                onClick = { uriHandler.openUri(sourceUrl) },
+                                modifier = Modifier.align(Alignment.Start),
+                            ) {
+                                Text(stringResource(R.string.open_source_page))
+                            }
+                        }
+                    }
                 }
 
                 Button(
@@ -200,6 +247,31 @@ fun LocalBookDetailsScreen(
         }
     }
 }
+
+@Composable
+private fun BookFact(
+    label: String,
+    value: String,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Text(text = value, style = MaterialTheme.typography.bodyMedium)
+    }
+}
+
+@Composable
+private fun localizedBookLanguage(code: String): String = stringResource(
+    when (code) {
+        "rus" -> R.string.language_russian
+        "eng" -> R.string.language_english
+        "ita" -> R.string.language_italian
+        else -> R.string.language_other
+    },
+)
 
 @Composable
 private fun EditMetadataDialog(

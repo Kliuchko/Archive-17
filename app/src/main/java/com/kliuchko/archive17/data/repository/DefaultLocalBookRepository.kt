@@ -9,6 +9,7 @@ import com.kliuchko.archive17.data.local.mapper.toDomain
 import com.kliuchko.archive17.data.local.mapper.toEntity
 import com.kliuchko.archive17.data.reader.ReadiumService
 import com.kliuchko.archive17.domain.model.LocalBook
+import com.kliuchko.archive17.domain.model.DownloadedBookMetadata
 import com.kliuchko.archive17.domain.model.ReadingStatus
 import com.kliuchko.archive17.domain.repository.LocalBookRepository
 import com.kliuchko.archive17.domain.repository.RepositoryResult
@@ -16,6 +17,7 @@ import java.io.File
 import java.io.FileOutputStream
 import java.security.MessageDigest
 import java.util.UUID
+import java.io.InputStream
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -45,60 +47,22 @@ class DefaultLocalBookRepository(
 
     override suspend fun importBook(sourceUri: String): RepositoryResult<LocalBook> =
         withContext(Dispatchers.IO) {
-            val id = UUID.randomUUID().toString()
-            booksDirectory.mkdirs()
-            val destination = File(booksDirectory, "$id.epub")
-
-            try {
-                val uri = Uri.parse(sourceUri)
-                appContext.contentResolver.openInputStream(uri)?.use { input ->
-                    destination.outputStream().use(input::copyTo)
-                } ?: return@withContext RepositoryResult.Error("Не удалось прочитать выбранный файл.")
-
-                val contentHash = destination.sha256()
-                backfillContentHashes()
-                val duplicate = localBookDao.getLocalBookByContentHash(contentHash)
-                if (duplicate != null) {
-                    destination.delete()
-                    return@withContext RepositoryResult.Error(
-                        "Эта книга уже находится на Полке: «${duplicate.title}».",
-                    )
-                }
-
-                val publication = readiumService.open(destination)
-                try {
-                    if (!publication.conformsTo(Publication.Profile.EPUB)) {
-                        destination.delete()
-                        return@withContext RepositoryResult.Error("Пока можно добавлять только книги в формате EPUB.")
-                    }
-
-                    val now = timeProvider.currentTimeMillis()
-                    val book = LocalBook(
-                        id = id,
-                        title = publication.metadata.title?.takeIf(String::isNotBlank)
-                            ?: destination.nameWithoutExtension,
-                        author = publication.metadata.authors.firstOrNull()?.name
-                            ?.takeIf(String::isNotBlank),
-                        identifier = publication.metadata.identifier,
-                        contentHash = contentHash,
-                        filePath = destination.absolutePath,
-                        coverPath = storeCover(id, publication),
-                        progressionJson = null,
-                        readingStatus = ReadingStatus.WANT_TO_READ,
-                        addedAt = now,
-                        updatedAt = now,
-                    )
-                    localBookDao.upsertLocalBook(book.toEntity())
-                    RepositoryResult.Success(book)
-                } finally {
-                    publication.close()
-                }
-            } catch (exception: Throwable) {
-                if (exception is CancellationException) throw exception
-                destination.delete()
-                RepositoryResult.Error("Не удалось открыть EPUB. Проверьте, что файл не повреждён.")
-            }
+            val uri = Uri.parse(sourceUri)
+            val input = appContext.contentResolver.openInputStream(uri)
+                ?: return@withContext RepositoryResult.Error("Не удалось прочитать выбранный файл.")
+            input.use { importFromStream(it, metadata = null) }
         }
+
+    override suspend fun importDownloadedBook(
+        sourceFilePath: String,
+        metadata: DownloadedBookMetadata,
+    ): RepositoryResult<LocalBook> = withContext(Dispatchers.IO) {
+        val source = File(sourceFilePath)
+        if (!source.isFile) {
+            return@withContext RepositoryResult.Error("Загруженный файл книги больше не доступен.")
+        }
+        source.inputStream().buffered().use { importFromStream(it, metadata) }
+    }
 
     override suspend fun updateMetadata(
         id: String,
@@ -174,6 +138,67 @@ class DefaultLocalBookRepository(
             if (resized !== cover) resized.recycle()
         }
         return destination.absolutePath
+    }
+
+    private suspend fun importFromStream(
+        input: InputStream,
+        metadata: DownloadedBookMetadata?,
+    ): RepositoryResult<LocalBook> {
+        val id = UUID.randomUUID().toString()
+        booksDirectory.mkdirs()
+        val destination = File(booksDirectory, "$id.epub")
+
+        try {
+            destination.outputStream().buffered().use(input::copyTo)
+
+            val contentHash = destination.sha256()
+            backfillContentHashes()
+            val duplicate = localBookDao.getLocalBookByContentHash(contentHash)
+            if (duplicate != null) {
+                destination.delete()
+                return RepositoryResult.Error(
+                    "Эта книга уже находится на Полке: «${duplicate.title}».",
+                )
+            }
+
+            val publication = readiumService.open(destination)
+            try {
+                if (!publication.conformsTo(Publication.Profile.EPUB)) {
+                    destination.delete()
+                    return RepositoryResult.Error("Пока можно добавлять только книги в формате EPUB.")
+                }
+
+                val now = timeProvider.currentTimeMillis()
+                val book = LocalBook(
+                    id = id,
+                    title = metadata?.title?.takeIf(String::isNotBlank)
+                        ?: publication.metadata.title?.takeIf(String::isNotBlank)
+                        ?: destination.nameWithoutExtension,
+                    author = metadata?.author?.takeIf(String::isNotBlank)
+                        ?: publication.metadata.authors.firstOrNull()?.name?.takeIf(String::isNotBlank),
+                    identifier = publication.metadata.identifier ?: metadata?.identifier,
+                    contentHash = contentHash,
+                    filePath = destination.absolutePath,
+                    coverPath = storeCover(id, publication),
+                    progressionJson = null,
+                    readingStatus = ReadingStatus.WANT_TO_READ,
+                    addedAt = now,
+                    updatedAt = now,
+                    languageCode = metadata?.languageCode,
+                    sourceName = metadata?.sourceName,
+                    sourceUrl = metadata?.sourceUrl,
+                    isPublicAccess = metadata?.isPublicAccess == true,
+                )
+                localBookDao.upsertLocalBook(book.toEntity())
+                return RepositoryResult.Success(book)
+            } finally {
+                publication.close()
+            }
+        } catch (exception: Throwable) {
+            if (exception is CancellationException) throw exception
+            destination.delete()
+            return RepositoryResult.Error("Не удалось открыть EPUB. Проверьте, что файл не повреждён.")
+        }
     }
 
     private fun File.sha256(): String {

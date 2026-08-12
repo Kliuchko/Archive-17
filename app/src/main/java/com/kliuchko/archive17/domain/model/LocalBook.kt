@@ -12,4 +12,8 @@ data class LocalBook(
     val readingStatus: ReadingStatus,
     val addedAt: Long,
     val updatedAt: Long,
+    val languageCode: String? = null,
+    val sourceName: String? = null,
+    val sourceUrl: String? = null,
+    val isPublicAccess: Boolean = false,
 )

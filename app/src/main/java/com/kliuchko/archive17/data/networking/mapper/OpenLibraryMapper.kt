@@ -5,8 +5,46 @@ import com.kliuchko.archive17.data.networking.dto.OpenLibrarySearchDocDto
 import com.kliuchko.archive17.data.networking.dto.OpenLibrarySearchResponseDto
 import com.kliuchko.archive17.data.networking.dto.OpenLibraryWorkDto
 import com.kliuchko.archive17.domain.model.Work
+import com.kliuchko.archive17.domain.model.FreeBook
 
 fun OpenLibrarySearchResponseDto.toDomain(): List<Work> = docs.mapNotNull { it.toDomain() }
+
+fun OpenLibrarySearchResponseDto.toFreeBooks(expectedLanguageCode: String? = null): List<FreeBook> =
+    docs.mapNotNull { document ->
+        val workId = document.key.toWorkId() ?: return@mapNotNull null
+        val edition = document.editions
+            ?.docs
+            .orEmpty()
+            .firstOrNull {
+                it.ebookAccess == PUBLIC_ACCESS &&
+                    !it.key.isNullOrBlank() &&
+                    !it.archiveIdentifiers.isNullOrEmpty() &&
+                    (expectedLanguageCode == null || it.languages.orEmpty().contains(expectedLanguageCode))
+            }
+            ?: return@mapNotNull null
+        val title = edition.title.normalize() ?: document.title.normalize() ?: return@mapNotNull null
+        val editionId = edition.key
+            ?.removePrefix("/books/")
+            ?.takeIf(String::isNotBlank)
+            ?: return@mapNotNull null
+        val archiveIdentifier = edition.archiveIdentifiers
+            ?.firstOrNull()
+            ?.normalize()
+            ?: return@mapNotNull null
+        val languageCode = expectedLanguageCode
+            ?: edition.languages.normalizeList().firstOrNull()
+            ?: return@mapNotNull null
+
+        FreeBook(
+            workId = workId,
+            editionId = editionId,
+            title = title,
+            authors = document.authorNames.normalizeList(),
+            coverId = document.coverId,
+            languageCode = languageCode,
+            archiveIdentifier = archiveIdentifier,
+        )
+    }
 
 fun OpenLibrarySearchDocDto.toDomain(lastUpdatedAt: Long? = null): Work? {
     val workId = key.toWorkId() ?: return null
@@ -68,3 +106,5 @@ private fun JsonElement?.toDescription(): String? {
         else -> null
     }
 }
+
+private const val PUBLIC_ACCESS = "public"

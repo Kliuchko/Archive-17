@@ -22,4 +22,26 @@ data class OpenLibrarySearchDocDto(
     val editionCount: Int?,
     @SerializedName("language")
     val languages: List<String>?,
+    @SerializedName("ebook_access")
+    val ebookAccess: String? = null,
+    @SerializedName("editions")
+    val editions: OpenLibraryEditionsDto? = null,
+)
+
+data class OpenLibraryEditionsDto(
+    @SerializedName("docs")
+    val docs: List<OpenLibraryEditionSearchDto> = emptyList(),
+)
+
+data class OpenLibraryEditionSearchDto(
+    @SerializedName("key")
+    val key: String? = null,
+    @SerializedName("title")
+    val title: String? = null,
+    @SerializedName("language")
+    val languages: List<String>? = null,
+    @SerializedName("ebook_access")
+    val ebookAccess: String? = null,
+    @SerializedName("ia")
+    val archiveIdentifiers: List<String>? = null,
 )

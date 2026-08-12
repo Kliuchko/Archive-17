@@ -23,6 +23,7 @@ class SearchUiStateTest {
     fun `shows empty state only after completed search with no books`() {
         val state = SearchUiState(
             query = "austen",
+            isLoading = false,
             hasSearched = true,
             books = emptyList(),
         )
@@ -39,6 +40,14 @@ class SearchUiStateTest {
             books = emptyList(),
         )
 
+        assertFalse(state.showEmptyState)
+    }
+
+    @Test
+    fun `starts in loading state while starter catalog is requested`() {
+        val state = SearchUiState()
+
+        assertTrue(state.isLoading)
         assertFalse(state.showEmptyState)
     }
 }

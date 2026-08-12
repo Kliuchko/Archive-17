@@ -103,6 +103,9 @@ fun Archive17App(
                     onBookClick = { workId ->
                         navController.navigate(Archive17Destination.Details.createRoute(workId))
                     },
+                    onFreeBookReady = { bookId ->
+                        navController.navigate(Archive17Destination.LocalDetails.createRoute(bookId))
+                    },
                 )
             }
 

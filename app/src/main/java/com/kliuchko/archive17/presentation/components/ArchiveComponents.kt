@@ -32,6 +32,7 @@ import com.kliuchko.archive17.data.networking.CoverSize
 import com.kliuchko.archive17.data.networking.CoverUrlBuilder
 import com.kliuchko.archive17.domain.model.Work
 import com.kliuchko.archive17.domain.model.LocalBook
+import com.kliuchko.archive17.domain.model.FreeBook
 import java.io.File
 
 @Composable
@@ -143,6 +144,30 @@ fun BookCover(
         AsyncImage(
             model = coverUrl,
             contentDescription = work.title,
+            modifier = modifier
+                .size(width = width, height = height)
+                .clip(shape)
+                .background(MaterialTheme.colorScheme.tertiary),
+            contentScale = ContentScale.Crop,
+        )
+    }
+}
+
+@Composable
+fun FreeBookCover(
+    book: FreeBook,
+    modifier: Modifier = Modifier,
+    width: Dp = 58.dp,
+    height: Dp = 86.dp,
+) {
+    val shape = RoundedCornerShape(topStart = 5.dp, topEnd = 9.dp, bottomEnd = 9.dp, bottomStart = 5.dp)
+    val coverUrl = CoverUrlBuilder.build(book.coverId, CoverSize.MEDIUM)
+    if (coverUrl == null) {
+        GeneratedCover(book.title, modifier, width, height)
+    } else {
+        AsyncImage(
+            model = coverUrl,
+            contentDescription = book.title,
             modifier = modifier
                 .size(width = width, height = height)
                 .clip(shape)

@@ -62,6 +62,7 @@
     <string name="search_hint">Название или автор</string>
     <string name="open">Открыть</string>
     <string name="my_file">МОЙ ФАЙЛ</string>
+    <string name="open_collection_badge">ОТКРЫТЫЙ ФОНД</string>
     <string name="epub_offline">EPUB · доступно офлайн</string>
     <string name="read">Читать</string>
     <string name="continue_book_plain">Вернуться к книге</string>
@@ -115,4 +116,26 @@
     <string name="updating">Обновление</string>
     <string name="opening_book">Открываем книгу…</string>
     <string name="open_book_failed">Не удалось открыть книгу</string>
+    <string name="catalog_free_filter">Можно читать бесплатно</string>
+    <string name="catalog_all_filter">Все книги</string>
+    <string name="catalog_book_language">Язык книг: %1$s</string>
+    <string name="language_italian">Italiano</string>
+    <string name="language_other">Выбранный язык</string>
+    <string name="public_access">Открытый доступ</string>
+    <string name="free_source">Open Library · Internet Archive</string>
+    <string name="regional_rights_notice">Доступ отмечен источником как открытый. Права на конкретное издание могут зависеть от страны.</string>
+    <string name="download_to_shelf">На Полку</string>
+    <string name="downloading_book">Загружаем…</string>
+    <string name="checking_epub">Проверяем EPUB…</string>
+    <string name="catalog_loading_books">Подбираем книги…</string>
+    <string name="free_catalog_empty">Открытых EPUB на выбранном языке не найдено</string>
+    <string name="free_catalog_empty_body">Попробуйте другое название, автора или измените предпочтительный язык книг в Профиле.</string>
+    <string name="catalog_error_body">Проверьте соединение и попробуйте ещё раз.</string>
+    <string name="free_catalog_welcome">Найдите книгу, которую можно читать</string>
+    <string name="free_catalog_welcome_body">Archive 17 найдёт открытое издание на выбранном языке, загрузит EPUB на Полку и сохранит его для чтения офлайн.</string>
+    <string name="source_label">Источник</string>
+    <string name="public_access_details">Статус открытого доступа указан источником. Условия и права на конкретное издание смотрите на странице источника.</string>
+    <string name="open_source_page">Открыть страницу источника</string>
+    <string name="access_label">Доступ</string>
+    <string name="book_language_label">Язык книги</string>
 </resources>

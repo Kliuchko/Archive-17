@@ -4,11 +4,50 @@ import com.google.gson.JsonParser
 import com.kliuchko.archive17.data.networking.dto.OpenLibrarySearchDocDto
 import com.kliuchko.archive17.data.networking.dto.OpenLibrarySearchResponseDto
 import com.kliuchko.archive17.data.networking.dto.OpenLibraryWorkDto
+import com.kliuchko.archive17.data.networking.dto.OpenLibraryEditionSearchDto
+import com.kliuchko.archive17.data.networking.dto.OpenLibraryEditionsDto
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
 
 class OpenLibraryMapperTest {
+    @Test
+    fun `maps only public editions with archive files to free books`() {
+        val response = OpenLibrarySearchResponseDto(
+            docs = listOf(
+                OpenLibrarySearchDocDto(
+                    key = "/works/OL1W",
+                    title = "Work title",
+                    authorNames = listOf("Author"),
+                    coverId = 10,
+                    firstPublishYear = 1900,
+                    editionCount = 3,
+                    languages = listOf("eng"),
+                    ebookAccess = "public",
+                    editions = OpenLibraryEditionsDto(
+                        docs = listOf(
+                            OpenLibraryEditionSearchDto(
+                                key = "/books/OL1M",
+                                title = "Edition title",
+                                languages = listOf("eng"),
+                                ebookAccess = "public",
+                                archiveIdentifiers = listOf("archive-id"),
+                            ),
+                        ),
+                    ),
+                ),
+            ),
+        )
+
+        val result = response.toFreeBooks()
+
+        assertEquals(1, result.size)
+        assertEquals("OL1W", result.first().workId)
+        assertEquals("OL1M", result.first().editionId)
+        assertEquals("Edition title", result.first().title)
+        assertEquals("archive-id", result.first().archiveIdentifier)
+    }
+
     @Test
     fun `maps search documents to domain works`() {
         val response = OpenLibrarySearchResponseDto(

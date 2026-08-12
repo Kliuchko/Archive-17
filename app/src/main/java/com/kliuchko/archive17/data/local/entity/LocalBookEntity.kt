@@ -26,4 +26,8 @@ data class LocalBookEntity(
     val readingStatus: ReadingStatus,
     val addedAt: Long,
     val updatedAt: Long,
+    val languageCode: String?,
+    val sourceName: String?,
+    val sourceUrl: String?,
+    val isPublicAccess: Boolean,
 )

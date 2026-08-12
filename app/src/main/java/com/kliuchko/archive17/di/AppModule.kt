@@ -6,11 +6,14 @@ import com.kliuchko.archive17.core.time.SystemTimeProvider
 import com.kliuchko.archive17.core.time.TimeProvider
 import com.kliuchko.archive17.data.local.Archive17Database
 import com.kliuchko.archive17.data.networking.api.OpenLibraryApi
+import com.kliuchko.archive17.data.networking.api.InternetArchiveApi
 import com.kliuchko.archive17.data.repository.DefaultBookRepository
+import com.kliuchko.archive17.data.repository.DefaultFreeBookRepository
 import com.kliuchko.archive17.data.reader.ReadiumService
 import com.kliuchko.archive17.data.repository.DefaultLocalBookRepository
 import com.kliuchko.archive17.data.repository.DefaultLanguageSettingsRepository
 import com.kliuchko.archive17.domain.repository.BookRepository
+import com.kliuchko.archive17.domain.repository.FreeBookRepository
 import com.kliuchko.archive17.domain.repository.LocalBookRepository
 import com.kliuchko.archive17.domain.repository.LanguageSettingsRepository
 import com.kliuchko.archive17.presentation.details.BookDetailsViewModel
@@ -38,6 +41,7 @@ val appModule = module {
             .addMigrations(
                 Archive17Database.MIGRATION_1_2,
                 Archive17Database.MIGRATION_2_3,
+                Archive17Database.MIGRATION_3_4,
             )
             .build()
     }
@@ -60,6 +64,12 @@ val appModule = module {
 
     single {
         OkHttpClient.Builder()
+            .addInterceptor { chain ->
+                val request = chain.request().newBuilder()
+                    .header("User-Agent", "Archive17/1.0 (+https://github.com/Kliuchko/Archive-17)")
+                    .build()
+                chain.proceed(request)
+            }
             .addInterceptor(get<HttpLoggingInterceptor>())
             .build()
     }
@@ -74,6 +84,15 @@ val appModule = module {
 
     single<OpenLibraryApi> {
         get<Retrofit>().create(OpenLibraryApi::class.java)
+    }
+
+    single<InternetArchiveApi> {
+        Retrofit.Builder()
+            .baseUrl(InternetArchiveApi.BASE_URL)
+            .client(get())
+            .addConverterFactory(GsonConverterFactory.create())
+            .build()
+            .create(InternetArchiveApi::class.java)
     }
 
     single<BookRepository> {
@@ -98,8 +117,22 @@ val appModule = module {
         DefaultLanguageSettingsRepository(androidContext())
     }
 
+    single<FreeBookRepository> {
+        DefaultFreeBookRepository(
+            context = androidContext(),
+            openLibraryApi = get(),
+            internetArchiveApi = get(),
+            client = get(),
+            localBookRepository = get(),
+        )
+    }
+
     viewModel {
-        SearchViewModel(repository = get())
+        SearchViewModel(
+            repository = get(),
+            freeBookRepository = get(),
+            languageSettingsRepository = get(),
+        )
     }
 
     viewModel { parameters ->

@@ -14,6 +14,14 @@ interface OpenLibraryApi {
         @Query("limit") limit: Int = SEARCH_LIMIT,
     ): OpenLibrarySearchResponseDto
 
+    @GET("search.json")
+    suspend fun searchFreeBooks(
+        @Query("q") query: String,
+        @Query("fields") fields: String = FREE_SEARCH_FIELDS,
+        @Query("limit") limit: Int = FREE_SEARCH_LIMIT,
+        @Query("lang") language: String,
+    ): OpenLibrarySearchResponseDto
+
     @GET("works/{workId}.json")
     suspend fun getWork(
         @Path("workId") workId: String,
@@ -22,6 +30,10 @@ interface OpenLibraryApi {
     companion object {
         const val BASE_URL = "https://openlibrary.org/"
         const val SEARCH_LIMIT = 20
+        const val FREE_SEARCH_LIMIT = 12
         const val SEARCH_FIELDS = "key,title,author_name,cover_i,first_publish_year,edition_count,language"
+        const val FREE_SEARCH_FIELDS =
+            "key,title,author_name,cover_i,language,ebook_access," +
+                "editions,editions.key,editions.title,editions.language,editions.ebook_access,editions.ia"
     }
 }

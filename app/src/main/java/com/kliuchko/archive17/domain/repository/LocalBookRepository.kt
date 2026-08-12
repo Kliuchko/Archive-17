@@ -1,6 +1,7 @@
 package com.kliuchko.archive17.domain.repository
 
 import com.kliuchko.archive17.domain.model.LocalBook
+import com.kliuchko.archive17.domain.model.DownloadedBookMetadata
 import com.kliuchko.archive17.domain.model.ReadingStatus
 import kotlinx.coroutines.flow.Flow
 
@@ -12,6 +13,11 @@ interface LocalBookRepository {
     suspend fun getLocalBook(id: String): LocalBook?
 
     suspend fun importBook(sourceUri: String): RepositoryResult<LocalBook>
+
+    suspend fun importDownloadedBook(
+        sourceFilePath: String,
+        metadata: DownloadedBookMetadata,
+    ): RepositoryResult<LocalBook>
 
     suspend fun updateMetadata(id: String, title: String, author: String?): RepositoryResult<LocalBook>
 

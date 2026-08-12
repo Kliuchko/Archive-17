@@ -213,6 +213,17 @@ private class FakeOpenLibraryApi : OpenLibraryApi {
         return searchResponse
     }
 
+    override suspend fun searchFreeBooks(
+        query: String,
+        fields: String,
+        limit: Int,
+        language: String,
+    ): OpenLibrarySearchResponseDto {
+        searchCallCount += 1
+        searchError?.let { throw it }
+        return searchResponse
+    }
+
     override suspend fun getWork(workId: String): OpenLibraryWorkDto {
         workError?.let { throw it }
         return workResponse
