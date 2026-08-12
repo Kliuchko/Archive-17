@@ -13,6 +13,7 @@ import com.kliuchko.archive17.domain.repository.BookRepository
 import com.kliuchko.archive17.domain.repository.LocalBookRepository
 import com.kliuchko.archive17.presentation.details.BookDetailsViewModel
 import com.kliuchko.archive17.presentation.library.LibraryViewModel
+import com.kliuchko.archive17.presentation.localdetails.LocalBookDetailsViewModel
 import com.kliuchko.archive17.presentation.search.SearchViewModel
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
@@ -31,7 +32,10 @@ val appModule = module {
             Archive17Database::class.java,
             Archive17Database.DATABASE_NAME,
         )
-            .addMigrations(Archive17Database.MIGRATION_1_2)
+            .addMigrations(
+                Archive17Database.MIGRATION_1_2,
+                Archive17Database.MIGRATION_2_3,
+            )
             .build()
     }
 
@@ -102,6 +106,13 @@ val appModule = module {
         LibraryViewModel(
             repository = get(),
             localBookRepository = get(),
+        )
+    }
+
+    viewModel { parameters ->
+        LocalBookDetailsViewModel(
+            bookId = parameters.get(),
+            repository = get(),
         )
     }
 }

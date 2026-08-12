@@ -24,6 +24,7 @@ import com.kliuchko.archive17.presentation.components.ArchiveNavigationIcon
 import com.kliuchko.archive17.presentation.details.BookDetailsScreen
 import com.kliuchko.archive17.presentation.home.HomeScreen
 import com.kliuchko.archive17.presentation.library.LibraryScreen
+import com.kliuchko.archive17.presentation.localdetails.LocalBookDetailsScreen
 import com.kliuchko.archive17.presentation.profile.ProfileScreen
 import com.kliuchko.archive17.presentation.reader.EpubReaderActivity
 import com.kliuchko.archive17.presentation.search.SearchScreen
@@ -131,6 +132,26 @@ fun Archive17App(
                         }
                     },
                     onLocalBookClick = { bookId ->
+                        navController.navigate(Archive17Destination.LocalDetails.createRoute(bookId))
+                    },
+                )
+            }
+
+            composable(
+                route = Archive17Destination.LocalDetails.route,
+                arguments = listOf(
+                    navArgument(Archive17Destination.LocalDetails.BOOK_ID_ARGUMENT) {
+                        type = NavType.StringType
+                    },
+                ),
+            ) { detailsEntry ->
+                val bookId = detailsEntry.arguments
+                    ?.getString(Archive17Destination.LocalDetails.BOOK_ID_ARGUMENT)
+                    .orEmpty()
+                LocalBookDetailsScreen(
+                    bookId = bookId,
+                    onBackClick = navController::popBackStack,
+                    onReadClick = {
                         context.startActivity(EpubReaderActivity.createIntent(context, bookId))
                     },
                 )

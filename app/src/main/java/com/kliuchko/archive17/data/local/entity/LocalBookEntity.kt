@@ -7,7 +7,11 @@ import com.kliuchko.archive17.domain.model.ReadingStatus
 
 @Entity(
     tableName = "local_books",
-    indices = [Index("readingStatus"), Index("updatedAt")],
+    indices = [
+        Index("readingStatus"),
+        Index("updatedAt"),
+        Index(value = ["contentHash"], unique = true),
+    ],
 )
 data class LocalBookEntity(
     @PrimaryKey
@@ -15,6 +19,7 @@ data class LocalBookEntity(
     val title: String,
     val author: String?,
     val identifier: String?,
+    val contentHash: String?,
     val filePath: String,
     val coverPath: String?,
     val progressionJson: String?,

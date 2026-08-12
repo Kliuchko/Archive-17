@@ -19,10 +19,46 @@ interface LocalBookDao {
     fun observeLocalBooks(status: ReadingStatus? = null): Flow<List<LocalBookEntity>>
 
     @Query("SELECT * FROM local_books WHERE id = :id")
+    fun observeLocalBook(id: String): Flow<LocalBookEntity?>
+
+    @Query("SELECT * FROM local_books WHERE id = :id")
     suspend fun getLocalBook(id: String): LocalBookEntity?
+
+    @Query("SELECT * FROM local_books WHERE contentHash = :contentHash LIMIT 1")
+    suspend fun getLocalBookByContentHash(contentHash: String): LocalBookEntity?
+
+    @Query("SELECT * FROM local_books WHERE contentHash IS NULL")
+    suspend fun getLocalBooksWithoutContentHash(): List<LocalBookEntity>
 
     @Upsert
     suspend fun upsertLocalBook(book: LocalBookEntity)
+
+    @Query(
+        """
+        UPDATE local_books
+        SET title = :title,
+            author = :author,
+            updatedAt = :updatedAt
+        WHERE id = :id
+        """,
+    )
+    suspend fun updateMetadata(id: String, title: String, author: String?, updatedAt: Long)
+
+    @Query("UPDATE local_books SET contentHash = :contentHash WHERE id = :id")
+    suspend fun updateContentHash(id: String, contentHash: String)
+
+    @Query(
+        """
+        UPDATE local_books
+        SET readingStatus = :readingStatus,
+            updatedAt = :updatedAt
+        WHERE id = :id
+        """,
+    )
+    suspend fun updateReadingStatus(id: String, readingStatus: ReadingStatus, updatedAt: Long)
+
+    @Query("DELETE FROM local_books WHERE id = :id")
+    suspend fun deleteLocalBook(id: String)
 
     @Query(
         """

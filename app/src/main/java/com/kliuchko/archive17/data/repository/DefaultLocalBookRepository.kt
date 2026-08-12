@@ -14,6 +14,7 @@ import com.kliuchko.archive17.domain.repository.LocalBookRepository
 import com.kliuchko.archive17.domain.repository.RepositoryResult
 import java.io.File
 import java.io.FileOutputStream
+import java.security.MessageDigest
 import java.util.UUID
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -36,6 +37,9 @@ class DefaultLocalBookRepository(
     override fun observeLocalBooks(status: ReadingStatus?): Flow<List<LocalBook>> =
         localBookDao.observeLocalBooks(status).map { books -> books.map { it.toDomain() } }
 
+    override fun observeLocalBook(id: String): Flow<LocalBook?> =
+        localBookDao.observeLocalBook(id).map { it?.toDomain() }
+
     override suspend fun getLocalBook(id: String): LocalBook? =
         localBookDao.getLocalBook(id)?.toDomain()
 
@@ -50,6 +54,16 @@ class DefaultLocalBookRepository(
                 appContext.contentResolver.openInputStream(uri)?.use { input ->
                     destination.outputStream().use(input::copyTo)
                 } ?: return@withContext RepositoryResult.Error("Не удалось прочитать выбранный файл.")
+
+                val contentHash = destination.sha256()
+                backfillContentHashes()
+                val duplicate = localBookDao.getLocalBookByContentHash(contentHash)
+                if (duplicate != null) {
+                    destination.delete()
+                    return@withContext RepositoryResult.Error(
+                        "Эта книга уже находится на Полке: «${duplicate.title}».",
+                    )
+                }
 
                 val publication = readiumService.open(destination)
                 try {
@@ -66,6 +80,7 @@ class DefaultLocalBookRepository(
                         author = publication.metadata.authors.firstOrNull()?.name
                             ?.takeIf(String::isNotBlank),
                         identifier = publication.metadata.identifier,
+                        contentHash = contentHash,
                         filePath = destination.absolutePath,
                         coverPath = storeCover(id, publication),
                         progressionJson = null,
@@ -82,6 +97,61 @@ class DefaultLocalBookRepository(
                 if (exception is CancellationException) throw exception
                 destination.delete()
                 RepositoryResult.Error("Не удалось открыть EPUB. Проверьте, что файл не повреждён.")
+            }
+        }
+
+    override suspend fun updateMetadata(
+        id: String,
+        title: String,
+        author: String?,
+    ): RepositoryResult<LocalBook> = withContext(Dispatchers.IO) {
+        val normalizedTitle = title.trim()
+        if (normalizedTitle.isEmpty()) {
+            return@withContext RepositoryResult.Error("Название книги не может быть пустым.")
+        }
+
+        runCatching {
+            localBookDao.updateMetadata(
+                id = id,
+                title = normalizedTitle,
+                author = author?.trim()?.takeIf(String::isNotEmpty),
+                updatedAt = timeProvider.currentTimeMillis(),
+            )
+            localBookDao.getLocalBook(id)?.toDomain()
+                ?: return@withContext RepositoryResult.Error("Книга больше не доступна.")
+        }.fold(
+            onSuccess = { RepositoryResult.Success(it) },
+            onFailure = { RepositoryResult.Error("Не удалось сохранить сведения о книге.") },
+        )
+    }
+
+    override suspend fun updateReadingStatus(
+        id: String,
+        status: ReadingStatus,
+    ): RepositoryResult<LocalBook> = withContext(Dispatchers.IO) {
+        runCatching {
+            localBookDao.updateReadingStatus(id, status, timeProvider.currentTimeMillis())
+            localBookDao.getLocalBook(id)?.toDomain()
+                ?: return@withContext RepositoryResult.Error("Книга больше не доступна.")
+        }.fold(
+            onSuccess = { RepositoryResult.Success(it) },
+            onFailure = { RepositoryResult.Error("Не удалось изменить статус книги.") },
+        )
+    }
+
+    override suspend fun deleteLocalBook(id: String): RepositoryResult<Unit> =
+        withContext(Dispatchers.IO) {
+            val book = localBookDao.getLocalBook(id)?.toDomain()
+                ?: return@withContext RepositoryResult.Success(Unit)
+
+            try {
+                localBookDao.deleteLocalBook(id)
+                File(book.filePath).delete()
+                book.coverPath?.let(::File)?.delete()
+                RepositoryResult.Success(Unit)
+            } catch (exception: Throwable) {
+                if (exception is CancellationException) throw exception
+                RepositoryResult.Error("Не удалось удалить книгу с Полки.")
             }
         }
 
@@ -104,5 +174,28 @@ class DefaultLocalBookRepository(
             if (resized !== cover) resized.recycle()
         }
         return destination.absolutePath
+    }
+
+    private fun File.sha256(): String {
+        val digest = MessageDigest.getInstance("SHA-256")
+        inputStream().buffered().use { input ->
+            val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+            while (true) {
+                val count = input.read(buffer)
+                if (count < 0) break
+                digest.update(buffer, 0, count)
+            }
+        }
+        return digest.digest().joinToString("") { byte -> "%02x".format(byte) }
+    }
+
+    private suspend fun backfillContentHashes() {
+        localBookDao.getLocalBooksWithoutContentHash().forEach { book ->
+            val file = File(book.filePath)
+            if (!file.exists()) return@forEach
+            runCatching {
+                localBookDao.updateContentHash(book.id, file.sha256())
+            }
+        }
     }
 }

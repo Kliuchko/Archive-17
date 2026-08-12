@@ -5,6 +5,7 @@ data class LocalBook(
     val title: String,
     val author: String?,
     val identifier: String?,
+    val contentHash: String?,
     val filePath: String,
     val coverPath: String?,
     val progressionJson: String?,

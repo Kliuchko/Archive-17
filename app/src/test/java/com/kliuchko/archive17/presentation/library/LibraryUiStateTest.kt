@@ -96,6 +96,7 @@ class LibraryUiStateTest {
         title = "Local book",
         author = "Author",
         identifier = null,
+        contentHash = "hash",
         filePath = "/books/local-1.epub",
         coverPath = null,
         progressionJson = null,

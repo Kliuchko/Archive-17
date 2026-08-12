@@ -25,4 +25,11 @@ sealed interface Archive17Destination {
 
         fun createRoute(workId: String): String = "details/$workId"
     }
+
+    data object LocalDetails : Archive17Destination {
+        const val BOOK_ID_ARGUMENT = "bookId"
+        override val route = "local-details/{$BOOK_ID_ARGUMENT}"
+
+        fun createRoute(bookId: String): String = "local-details/$bookId"
+    }
 }
