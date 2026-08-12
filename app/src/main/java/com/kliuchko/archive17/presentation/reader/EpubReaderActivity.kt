@@ -1,3 +1,5 @@
+@file:OptIn(org.readium.r2.shared.ExperimentalReadiumApi::class)
+
 package com.kliuchko.archive17.presentation.reader
 
 import android.content.Intent
@@ -8,6 +10,7 @@ import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.ProgressBar
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -61,11 +64,14 @@ class EpubReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener {
     private var openedPublication: org.readium.r2.shared.publication.Publication? = null
     private var readerTitle by mutableStateOf("")
     private var pageLabel by mutableStateOf("")
+    private var settingsVisible by mutableStateOf(false)
+    private var readerPreferences by mutableStateOf(ReaderPreferences.defaults())
     private var totalPositions = 0
 
     override fun onCreate(savedInstanceState: Bundle?) {
         supportFragmentManager.fragmentFactory = EpubNavigatorFragment.createDummyFactory()
         super.onCreate(null)
+        readerPreferences = loadReaderPreferences()
         createContent()
 
         val bookId = intent.getStringExtra(EXTRA_BOOK_ID)
@@ -102,6 +108,7 @@ class EpubReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener {
                 }
                 val factory = EpubNavigatorFactory(publication).createFragmentFactory(
                     initialLocator = initialLocator,
+                    initialPreferences = readerPreferences.toEpubPreferences(),
                     listener = this@EpubReaderActivity,
                 )
                 supportFragmentManager.fragmentFactory = factory
@@ -213,48 +220,64 @@ class EpubReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener {
         )
         setContentView(root)
         titleView.setContent {
-            Archive17Theme {
-                Surface(color = MaterialTheme.colorScheme.surface) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 8.dp, vertical = 4.dp),
-                        horizontalArrangement = Arrangement.spacedBy(2.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        TextButton(onClick = onBackPressedDispatcher::onBackPressed) {
-                            Text(getString(R.string.back))
-                        }
-                        Text(
-                            text = readerTitle,
-                            modifier = Modifier.weight(1f),
-                            style = MaterialTheme.typography.titleMedium,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                        if (pageLabel.isNotEmpty()) {
+            Archive17Theme(darkTheme = readerPreferences.theme == ReaderTheme.DARK) {
+                Surface(color = readerPreferences.toolbarColor()) {
+                    Column {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 8.dp, vertical = 4.dp),
+                            horizontalArrangement = Arrangement.spacedBy(2.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            TextButton(onClick = onBackPressedDispatcher::onBackPressed) {
+                                Text(getString(R.string.back))
+                            }
                             Text(
-                                text = pageLabel,
-                                style = MaterialTheme.typography.labelMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                text = readerTitle,
+                                modifier = Modifier.weight(1f),
+                                style = MaterialTheme.typography.titleMedium,
                                 maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
                             )
+                            if (pageLabel.isNotEmpty()) {
+                                Text(
+                                    text = pageLabel,
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    maxLines = 1,
+                                )
+                            }
+                            IconButton(
+                                onClick = { settingsVisible = !settingsVisible },
+                                modifier = Modifier.semantics {
+                                    contentDescription = getString(R.string.reader_settings)
+                                },
+                            ) {
+                                Text(text = "Aa", style = MaterialTheme.typography.labelLarge)
+                            }
+                            IconButton(
+                                onClick = { navigator?.goBackward(animated = true) },
+                                modifier = Modifier.semantics {
+                                    contentDescription = getString(R.string.reader_previous_page)
+                                },
+                            ) {
+                                Text(text = "‹", fontSize = 28.sp)
+                            }
+                            IconButton(
+                                onClick = { navigator?.goForward(animated = true) },
+                                modifier = Modifier.semantics {
+                                    contentDescription = getString(R.string.reader_next_page)
+                                },
+                            ) {
+                                Text(text = "›", fontSize = 28.sp)
+                            }
                         }
-                        IconButton(
-                            onClick = { navigator?.goBackward(animated = true) },
-                            modifier = Modifier.semantics {
-                                contentDescription = getString(R.string.reader_previous_page)
-                            },
-                        ) {
-                            Text(text = "‹", fontSize = 28.sp)
-                        }
-                        IconButton(
-                            onClick = { navigator?.goForward(animated = true) },
-                            modifier = Modifier.semantics {
-                                contentDescription = getString(R.string.reader_next_page)
-                            },
-                        ) {
-                            Text(text = "›", fontSize = 28.sp)
+                        if (settingsVisible) {
+                            ReaderSettingsPanel(
+                                preferences = readerPreferences,
+                                onChange = ::applyReaderPreferences,
+                            )
                         }
                     }
                 }
@@ -265,6 +288,36 @@ class EpubReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener {
 
     private fun showTitle(title: String) {
         readerTitle = title
+    }
+
+    private fun applyReaderPreferences(preferences: ReaderPreferences) {
+        readerPreferences = preferences
+        saveReaderPreferences(preferences)
+        navigator?.submitPreferences(preferences.toEpubPreferences())
+    }
+
+    private fun loadReaderPreferences(): ReaderPreferences {
+        val preferences = getSharedPreferences(READER_PREFERENCES, MODE_PRIVATE)
+        return ReaderPreferences.restored(
+            fontSize = preferences.getFloat(KEY_FONT_SIZE, DEFAULT_FONT_SIZE.toFloat()).toDouble(),
+            lineHeight = preferences.getFloat(KEY_LINE_HEIGHT, DEFAULT_LINE_HEIGHT.toFloat()).toDouble(),
+            font = preferences.getString(KEY_FONT, null)
+                ?.let { runCatching { ReaderFont.valueOf(it) }.getOrNull() }
+                ?: ReaderFont.PUBLISHER,
+            theme = preferences.getString(KEY_THEME, null)
+                ?.let { runCatching { ReaderTheme.valueOf(it) }.getOrNull() }
+                ?: ReaderTheme.LIGHT,
+        )
+    }
+
+    private fun saveReaderPreferences(preferences: ReaderPreferences) {
+        getSharedPreferences(READER_PREFERENCES, MODE_PRIVATE)
+            .edit()
+            .putFloat(KEY_FONT_SIZE, preferences.fontSize.toFloat())
+            .putFloat(KEY_LINE_HEIGHT, preferences.lineHeight.toFloat())
+            .putString(KEY_FONT, preferences.font.name)
+            .putString(KEY_THEME, preferences.theme.name)
+            .apply()
     }
 
     private fun updatePageLabel(locator: Locator) {
@@ -292,6 +345,13 @@ class EpubReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener {
         private const val NAVIGATOR_TAG = "epub_navigator"
         private const val TEMPORARY_READING_DIRECTORY = "temporary-reading"
         private const val TEMPORARY_PROGRESSION_PREFERENCES = "temporary_reader_progress"
+        private const val READER_PREFERENCES = "reader_preferences"
+        private const val KEY_FONT_SIZE = "font_size"
+        private const val KEY_LINE_HEIGHT = "line_height"
+        private const val KEY_FONT = "font"
+        private const val KEY_THEME = "theme"
+        private const val DEFAULT_FONT_SIZE = 1.0
+        private const val DEFAULT_LINE_HEIGHT = 1.5
 
         fun createIntent(context: android.content.Context, bookId: String): Intent =
             Intent(context, EpubReaderActivity::class.java).putExtra(EXTRA_BOOK_ID, bookId)
