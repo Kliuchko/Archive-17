@@ -118,10 +118,12 @@
     <string name="open_book_failed">Не удалось открыть книгу</string>
     <string name="catalog_free_filter">Можно читать бесплатно</string>
     <string name="catalog_all_filter">Все книги</string>
-    <string name="catalog_book_language">Язык книг: %1$s</string>
+    <string name="catalog_book_language">Доступно на языке: %1$s</string>
+    <string name="catalog_language_scope">Оригиналы и доступные переводы на выбранном языке.</string>
     <string name="language_italian">Italiano</string>
     <string name="language_other">Выбранный язык</string>
     <string name="public_access">Открытый доступ</string>
+    <string name="open_edition">Открытое издание</string>
     <string name="free_source">Open Library · Internet Archive</string>
     <string name="regional_rights_notice">Доступ отмечен источником как открытый. Права на конкретное издание могут зависеть от страны.</string>
     <string name="download_to_shelf">На Полку</string>
@@ -136,6 +138,14 @@
     <string name="source_label">Источник</string>
     <string name="public_access_details">Статус открытого доступа указан источником. Условия и права на конкретное издание смотрите на странице источника.</string>
     <string name="open_source_page">Открыть страницу источника</string>
+    <string name="edition_language_label">Язык доступного издания</string>
+    <string name="epub_format">EPUB</string>
+    <string name="catalog_topics">Темы</string>
+    <string name="more_details">Подробнее</string>
+    <string name="other_open_editions">Другие открытые издания</string>
+    <string name="other_open_editions_body">Источник отмечает их как открытые. Подходящий EPUB для Полки пока не подтверждён, но книгу можно проверить у источника.</string>
+    <string name="epub_not_confirmed_short">EPUB для Полки пока не подтверждён</string>
+    <string name="epub_not_confirmed_details">Источник отмечает издание как открытое, но Archive 17 пока не подтвердил EPUB подходящего языка и размера. Книгу можно открыть на странице источника.</string>
     <string name="access_label">Доступ</string>
     <string name="book_language_label">Язык книги</string>
 </resources>

@@ -46,6 +46,55 @@ class OpenLibraryMapperTest {
         assertEquals("OL1M", result.first().editionId)
         assertEquals("Edition title", result.first().title)
         assertEquals("archive-id", result.first().archiveIdentifier)
+        assertEquals(1900, result.first().firstPublishYear)
+    }
+
+    @Test
+    fun `uses cyrillic work title when russian edition title is romanized`() {
+        assertEquals(
+            "Идиот",
+            localizedTitle(
+                editionTitle = "Idot",
+                workTitle = "Идиот",
+                languageCode = "rus",
+            ),
+        )
+    }
+
+    @Test
+    fun `removes catalog accents from russian title`() {
+        assertEquals(
+            "Братья Карамазовы",
+            localizedTitle(
+                editionTitle = "Бра́тья Карама́зовы",
+                workTitle = "Братья Карамазовы",
+                languageCode = "rus",
+            ),
+        )
+    }
+
+    @Test
+    fun `transliterates romanized russian edition title when localized title is absent`() {
+        assertEquals(
+            "Макбет",
+            localizedTitle(
+                editionTitle = "Makbet",
+                workTitle = "Macbeth",
+                languageCode = "rus",
+            ),
+        )
+    }
+
+    @Test
+    fun `removes duplicate romanized title from russian edition`() {
+        assertEquals(
+            "Казаки",
+            localizedTitle(
+                editionTitle = "Казаки (Kazaki)",
+                workTitle = "The Cossacks",
+                languageCode = "rus",
+            ),
+        )
     }
 
     @Test

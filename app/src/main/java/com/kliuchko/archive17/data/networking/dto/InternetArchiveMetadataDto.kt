@@ -1,7 +1,7 @@
 package com.kliuchko.archive17.data.networking.dto
 
-data class InternetArchiveMetadataDto(
-    val files: List<InternetArchiveFileDto> = emptyList(),
+data class InternetArchiveFilesDto(
+    val result: List<InternetArchiveFileDto> = emptyList(),
 )
 
 data class InternetArchiveFileDto(

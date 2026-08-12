@@ -11,6 +11,9 @@ import com.kliuchko.archive17.domain.repository.FreeBookRepository
 import com.kliuchko.archive17.domain.repository.LanguageSettingsRepository
 import com.kliuchko.archive17.domain.repository.RepositoryResult
 import kotlinx.coroutines.FlowPreview
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -61,6 +64,11 @@ class SearchViewModel(
                 } else {
                     it.freeBooks
                 },
+                otherFreeBooks = if (normalizedLength in 1 until SearchUiState.MIN_QUERY_LENGTH) {
+                    emptyList()
+                } else {
+                    it.otherFreeBooks
+                },
                 books = if (normalizedLength in 1 until SearchUiState.MIN_QUERY_LENGTH) {
                     emptyList()
                 } else {
@@ -80,6 +88,7 @@ class SearchViewModel(
                 isCheckingFreeBooks = false,
                 books = emptyList(),
                 freeBooks = emptyList(),
+                otherFreeBooks = emptyList(),
                 errorMessage = null,
                 actionMessage = null,
                 hasSearched = false,
@@ -88,7 +97,7 @@ class SearchViewModel(
     }
 
     fun downloadBook(book: FreeBook) {
-        if (_uiState.value.downloadingBookId != null) return
+        if (_uiState.value.downloadingBookId != null || book.epubFileName == null) return
         viewModelScope.launch {
             _uiState.update {
                 it.copy(
@@ -126,6 +135,7 @@ class SearchViewModel(
                     isCheckingFreeBooks = false,
                     books = emptyList(),
                     freeBooks = emptyList(),
+                    otherFreeBooks = emptyList(),
                     errorMessage = null,
                     actionMessage = null,
                     hasSearched = false,
@@ -155,56 +165,136 @@ class SearchViewModel(
 
     private suspend fun searchFreeBooks(query: String, languageCode: String) {
         when (val result = freeBookRepository.searchBooks(query, languageCode)) {
-            is RepositoryResult.Success -> showFreeBookCandidates(result.data)
-            is RepositoryResult.Cached -> showFreeBookCandidates(result.data, result.message)
+            is RepositoryResult.Success -> {
+                showFreeBookCandidates(result.data, languageCode)
+                fillFreeBookCatalog(query, languageCode)
+            }
+            is RepositoryResult.Cached -> {
+                showFreeBookCandidates(result.data, languageCode, result.message)
+                fillFreeBookCatalog(query, languageCode)
+            }
             is RepositoryResult.Error -> showSearchError(result.message)
         }
     }
 
     private suspend fun showFreeBookCandidates(
         candidates: List<FreeBook>,
+        languageCode: String,
         notice: String? = null,
     ) {
         _uiState.update {
             it.copy(
-                isLoading = false,
+                isLoading = it.freeBooks.isEmpty() && candidates.isNotEmpty(),
                 isCheckingFreeBooks = candidates.isNotEmpty(),
                 books = emptyList(),
-                freeBooks = candidates,
                 errorMessage = null,
                 actionMessage = notice,
                 hasSearched = true,
             )
         }
 
-        if (candidates.isEmpty()) return
+        if (candidates.isEmpty()) {
+            _uiState.update {
+                it.copy(
+                    isLoading = false,
+                    isCheckingFreeBooks = false,
+                    freeBooks = emptyList(),
+                    otherFreeBooks = emptyList(),
+                )
+            }
+            return
+        }
 
         when (
             val availability = freeBookRepository.keepDownloadableBooks(
                 books = candidates,
-                languageCode = _uiState.value.bookLanguageCode,
+                languageCode = languageCode,
             )
         ) {
             is RepositoryResult.Success -> _uiState.update {
+                val verifiedIds = availability.data.mapTo(mutableSetOf(), FreeBook::editionId)
                 it.copy(
+                    isLoading = false,
                     isCheckingFreeBooks = false,
                     freeBooks = availability.data,
+                    otherFreeBooks = candidates.filterNot { book -> book.editionId in verifiedIds },
                 )
             }
             is RepositoryResult.Cached -> _uiState.update {
+                val verifiedIds = availability.data.mapTo(mutableSetOf(), FreeBook::editionId)
                 it.copy(
+                    isLoading = false,
                     isCheckingFreeBooks = false,
                     freeBooks = availability.data,
+                    otherFreeBooks = candidates.filterNot { book -> book.editionId in verifiedIds },
                     actionMessage = availability.message,
                 )
             }
             is RepositoryResult.Error -> _uiState.update {
                 it.copy(
+                    isLoading = false,
                     isCheckingFreeBooks = false,
+                    freeBooks = emptyList(),
+                    otherFreeBooks = candidates,
                     actionMessage = availability.message,
                 )
             }
         }
+    }
+
+    private suspend fun fillFreeBookCatalog(query: String, languageCode: String) {
+        if (_uiState.value.freeBooks.size >= CATALOG_TARGET_SIZE) return
+
+        _uiState.update { it.copy(isCheckingFreeBooks = true) }
+        val additionalPages = coroutineScope {
+            (2..MAX_CATALOG_PAGES).map { page ->
+                async { loadClassifiedFreeBookPage(query, languageCode, page) }
+            }.awaitAll()
+        }
+        _uiState.update { state ->
+            val verified = (state.freeBooks + additionalPages.flatMap { it.verified })
+                .distinctBy(FreeBook::editionId)
+                .take(CATALOG_TARGET_SIZE)
+            val verifiedIds = verified.mapTo(mutableSetOf(), FreeBook::editionId)
+            val other = (state.otherFreeBooks + additionalPages.flatMap { it.other })
+                .distinctBy(FreeBook::editionId)
+                .filterNot { it.editionId in verifiedIds }
+                .take(OTHER_CATALOG_SIZE)
+            state.copy(
+                isCheckingFreeBooks = false,
+                freeBooks = verified,
+                otherFreeBooks = other,
+            )
+        }
+    }
+
+    private suspend fun loadClassifiedFreeBookPage(
+        query: String,
+        languageCode: String,
+        page: Int,
+    ): ClassifiedFreeBooks {
+        val candidates = when (
+            val searchResult = freeBookRepository.searchBooks(query, languageCode, page)
+        ) {
+            is RepositoryResult.Success -> searchResult.data
+            is RepositoryResult.Cached -> searchResult.data
+            is RepositoryResult.Error -> return ClassifiedFreeBooks()
+        }
+        return when (
+            val availability = freeBookRepository.keepDownloadableBooks(candidates, languageCode)
+        ) {
+            is RepositoryResult.Success -> candidates.classify(availability.data)
+            is RepositoryResult.Cached -> candidates.classify(availability.data)
+            is RepositoryResult.Error -> ClassifiedFreeBooks(other = candidates)
+        }
+    }
+
+    private fun List<FreeBook>.classify(verified: List<FreeBook>): ClassifiedFreeBooks {
+        val verifiedIds = verified.mapTo(mutableSetOf(), FreeBook::editionId)
+        return ClassifiedFreeBooks(
+            verified = verified,
+            other = filterNot { it.editionId in verifiedIds },
+        )
     }
 
     private suspend fun searchAllBooks(query: String) {
@@ -232,6 +322,7 @@ class SearchViewModel(
                 isCheckingFreeBooks = false,
                 books = books,
                 freeBooks = emptyList(),
+                otherFreeBooks = emptyList(),
                 errorMessage = null,
                 actionMessage = notice,
                 hasSearched = true,
@@ -246,6 +337,7 @@ class SearchViewModel(
                 isCheckingFreeBooks = false,
                 books = emptyList(),
                 freeBooks = emptyList(),
+                otherFreeBooks = emptyList(),
                 errorMessage = message,
                 actionMessage = null,
                 hasSearched = true,
@@ -256,12 +348,20 @@ class SearchViewModel(
     private companion object {
         const val SEARCH_DEBOUNCE_MILLIS = 350L
         const val STARTER_ALL_BOOKS_QUERY = "subject:fiction"
+        const val CATALOG_TARGET_SIZE = 10
+        const val OTHER_CATALOG_SIZE = 20
+        const val MAX_CATALOG_PAGES = 3
     }
 
     private data class SearchRequest(
         val query: String,
         val mode: CatalogMode,
         val languageCode: String,
+    )
+
+    private data class ClassifiedFreeBooks(
+        val verified: List<FreeBook> = emptyList(),
+        val other: List<FreeBook> = emptyList(),
     )
 
     private fun BookLanguage.toCatalogCode(): String = when (this) {

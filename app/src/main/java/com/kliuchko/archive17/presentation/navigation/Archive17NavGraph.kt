@@ -25,6 +25,7 @@ import androidx.navigation.navArgument
 import com.kliuchko.archive17.presentation.components.ArchiveNavIcon
 import com.kliuchko.archive17.presentation.components.ArchiveNavigationIcon
 import com.kliuchko.archive17.presentation.details.BookDetailsScreen
+import com.kliuchko.archive17.presentation.freedetails.FreeBookDetailsScreen
 import com.kliuchko.archive17.presentation.home.HomeScreen
 import com.kliuchko.archive17.presentation.library.LibraryScreen
 import com.kliuchko.archive17.presentation.localdetails.LocalBookDetailsScreen
@@ -103,7 +104,30 @@ fun Archive17App(
                     onBookClick = { workId ->
                         navController.navigate(Archive17Destination.Details.createRoute(workId))
                     },
+                    onFreeBookClick = { editionId ->
+                        navController.navigate(Archive17Destination.FreeDetails.createRoute(editionId))
+                    },
                     onFreeBookReady = { bookId ->
+                        navController.navigate(Archive17Destination.LocalDetails.createRoute(bookId))
+                    },
+                )
+            }
+
+            composable(
+                route = Archive17Destination.FreeDetails.route,
+                arguments = listOf(
+                    navArgument(Archive17Destination.FreeDetails.EDITION_ID_ARGUMENT) {
+                        type = NavType.StringType
+                    },
+                ),
+            ) { detailsEntry ->
+                val editionId = detailsEntry.arguments
+                    ?.getString(Archive17Destination.FreeDetails.EDITION_ID_ARGUMENT)
+                    .orEmpty()
+                FreeBookDetailsScreen(
+                    editionId = editionId,
+                    onBackClick = navController::popBackStack,
+                    onBookReady = { bookId ->
                         navController.navigate(Archive17Destination.LocalDetails.createRoute(bookId))
                     },
                 )

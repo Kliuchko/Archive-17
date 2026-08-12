@@ -44,6 +44,7 @@ import org.koin.androidx.compose.koinViewModel
 @Composable
 fun SearchScreen(
     onBookClick: (String) -> Unit,
+    onFreeBookClick: (String) -> Unit,
     onFreeBookReady: (String) -> Unit,
     modifier: Modifier = Modifier,
     viewModel: SearchViewModel = koinViewModel(),
@@ -116,6 +117,11 @@ fun SearchScreen(
                     color = MaterialTheme.colorScheme.primary,
                 )
                 Text(
+                    text = stringResource(R.string.catalog_language_scope),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Text(
                     text = stringResource(R.string.regional_rights_notice),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -131,6 +137,7 @@ fun SearchScreen(
             SearchResults(
                 uiState = uiState,
                 onBookClick = onBookClick,
+                onFreeBookClick = onFreeBookClick,
                 onDownloadBook = viewModel::downloadBook,
                 modifier = Modifier.fillMaxSize(),
             )
@@ -142,6 +149,7 @@ fun SearchScreen(
 private fun SearchResults(
     uiState: SearchUiState,
     onBookClick: (String) -> Unit,
+    onFreeBookClick: (String) -> Unit,
     onDownloadBook: (FreeBook) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -154,7 +162,10 @@ private fun SearchResults(
             )
         }
 
-        uiState.errorMessage != null && uiState.books.isEmpty() && uiState.freeBooks.isEmpty() -> {
+        uiState.errorMessage != null &&
+            uiState.books.isEmpty() &&
+            uiState.freeBooks.isEmpty() &&
+            uiState.otherFreeBooks.isEmpty() -> {
             EmptyMessage(
                 title = stringResource(R.string.catalog_unavailable),
                 body = uiState.errorMessage,
@@ -162,7 +173,10 @@ private fun SearchResults(
             )
         }
 
-        uiState.isLoading && uiState.books.isEmpty() && uiState.freeBooks.isEmpty() -> {
+        uiState.isLoading &&
+            uiState.books.isEmpty() &&
+            uiState.freeBooks.isEmpty() &&
+            uiState.otherFreeBooks.isEmpty() -> {
             CatalogLoadingPlaceholder(modifier = modifier)
         }
 
@@ -186,7 +200,7 @@ private fun SearchResults(
             )
         }
 
-        uiState.freeBooks.isNotEmpty() -> {
+        uiState.freeBooks.isNotEmpty() || uiState.otherFreeBooks.isNotEmpty() -> {
             Box(modifier = modifier) {
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
@@ -204,12 +218,43 @@ private fun SearchResults(
                     ) { book ->
                         FreeBookResultCard(
                             book = book,
+                            canDownload = true,
                             isDownloading = uiState.downloadingBookId == book.editionId,
-                            downloadsEnabled = uiState.downloadingBookId == null &&
-                                !uiState.isCheckingFreeBooks,
-                            isCheckingAvailability = uiState.isCheckingFreeBooks,
+                            downloadsEnabled = uiState.downloadingBookId == null,
+                            onOpen = { onFreeBookClick(book.editionId) },
                             onDownload = { onDownloadBook(book) },
                         )
+                    }
+                    if (uiState.otherFreeBooks.isNotEmpty()) {
+                        item(key = "other-open-editions-heading") {
+                            Column(
+                                modifier = Modifier.padding(top = 10.dp, bottom = 2.dp),
+                                verticalArrangement = Arrangement.spacedBy(4.dp),
+                            ) {
+                                Text(
+                                    text = stringResource(R.string.other_open_editions),
+                                    style = MaterialTheme.typography.titleMedium,
+                                )
+                                Text(
+                                    text = stringResource(R.string.other_open_editions_body),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                        }
+                        items(
+                            items = uiState.otherFreeBooks,
+                            key = { "other-${it.editionId}" },
+                        ) { book ->
+                            FreeBookResultCard(
+                                book = book,
+                                canDownload = false,
+                                isDownloading = false,
+                                downloadsEnabled = false,
+                                onOpen = { onFreeBookClick(book.editionId) },
+                                onDownload = { onFreeBookClick(book.editionId) },
+                            )
+                        }
                     }
                 }
                 if (uiState.isLoading || uiState.isCheckingFreeBooks) {
@@ -255,14 +300,17 @@ private fun SearchResults(
 @Composable
 private fun FreeBookResultCard(
     book: FreeBook,
+    canDownload: Boolean,
     isDownloading: Boolean,
     downloadsEnabled: Boolean,
-    isCheckingAvailability: Boolean,
+    onOpen: () -> Unit,
     onDownload: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Card(
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier
+            .fillMaxWidth()
+            .clickable(onClick = onOpen),
         shape = RoundedCornerShape(15.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
     ) {
@@ -290,25 +338,29 @@ private fun FreeBookResultCard(
                     overflow = TextOverflow.Ellipsis,
                 )
                 Text(
-                    text = "${stringResource(R.string.public_access)} · ${localizedLanguageName(book.languageCode)}",
+                    text = "${stringResource(
+                        if (canDownload) R.string.public_access else R.string.open_edition,
+                    )} · ${localizedLanguageName(book.languageCode)}",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.primary,
                 )
                 Text(
-                    text = stringResource(R.string.free_source),
+                    text = stringResource(
+                        if (canDownload) R.string.free_source else R.string.epub_not_confirmed_short,
+                    ),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Button(
-                    onClick = onDownload,
-                    enabled = downloadsEnabled,
+                    onClick = if (canDownload) onDownload else onOpen,
+                    enabled = !canDownload || downloadsEnabled,
                 ) {
                     Text(
                         stringResource(
                             when {
                                 isDownloading -> R.string.downloading_book
-                                isCheckingAvailability -> R.string.checking_epub
-                                else -> R.string.download_to_shelf
+                                canDownload -> R.string.download_to_shelf
+                                else -> R.string.more_details
                             },
                         ),
                     )

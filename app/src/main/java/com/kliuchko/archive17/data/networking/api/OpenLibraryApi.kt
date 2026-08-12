@@ -19,6 +19,7 @@ interface OpenLibraryApi {
         @Query("q") query: String,
         @Query("fields") fields: String = FREE_SEARCH_FIELDS,
         @Query("limit") limit: Int = FREE_SEARCH_LIMIT,
+        @Query("page") page: Int = 1,
         @Query("lang") language: String,
     ): OpenLibrarySearchResponseDto
 
@@ -33,7 +34,7 @@ interface OpenLibraryApi {
         const val FREE_SEARCH_LIMIT = 12
         const val SEARCH_FIELDS = "key,title,author_name,cover_i,first_publish_year,edition_count,language"
         const val FREE_SEARCH_FIELDS =
-            "key,title,author_name,cover_i,language,ebook_access," +
+            "key,title,author_name,cover_i,first_publish_year,language,ebook_access," +
                 "editions,editions.key,editions.title,editions.language,editions.ebook_access,editions.ia"
     }
 }

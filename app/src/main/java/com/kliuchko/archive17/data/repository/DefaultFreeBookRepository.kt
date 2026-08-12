@@ -3,18 +3,26 @@ package com.kliuchko.archive17.data.repository
 import android.content.Context
 import com.kliuchko.archive17.data.networking.api.InternetArchiveApi
 import com.kliuchko.archive17.data.networking.api.OpenLibraryApi
+import com.kliuchko.archive17.data.networking.dto.InternetArchiveFileDto
 import com.kliuchko.archive17.data.networking.mapper.toFreeBooks
+import com.kliuchko.archive17.data.networking.mapper.toDomain
 import com.kliuchko.archive17.domain.model.DownloadedBookMetadata
 import com.kliuchko.archive17.domain.model.FreeBook
+import com.kliuchko.archive17.domain.model.FreeBookDetails
 import com.kliuchko.archive17.domain.model.LocalBook
+import com.kliuchko.archive17.domain.model.Work
 import com.kliuchko.archive17.domain.repository.FreeBookRepository
 import com.kliuchko.archive17.domain.repository.LocalBookRepository
 import com.kliuchko.archive17.domain.repository.RepositoryResult
 import java.io.File
 import java.io.InputStream
 import java.util.UUID
+import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withContext
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.OkHttpClient
@@ -28,10 +36,12 @@ class DefaultFreeBookRepository(
     private val localBookRepository: LocalBookRepository,
 ) : FreeBookRepository {
     private val downloadDirectory = File(context.applicationContext.cacheDir, "free-book-downloads")
+    private val booksByEditionId = ConcurrentHashMap<String, FreeBook>()
 
     override suspend fun searchBooks(
         query: String,
         languageCode: String,
+        page: Int,
     ): RepositoryResult<List<FreeBook>> {
         val normalizedQuery = query.trim()
         if (normalizedQuery.isNotEmpty() && normalizedQuery.length < MIN_SEARCH_QUERY_LENGTH) {
@@ -47,11 +57,54 @@ class DefaultFreeBookRepository(
             val books = openLibraryApi.searchFreeBooks(
                 query = searchQuery,
                 language = languageCode.toIso6391(),
+                page = page.coerceAtLeast(1),
             ).toFreeBooks(expectedLanguageCode = languageCode)
+            books.forEach { book -> booksByEditionId[book.editionId] = book }
             RepositoryResult.Success(books)
         } catch (exception: Throwable) {
             if (exception is CancellationException) throw exception
             RepositoryResult.Error("Не удалось найти бесплатные книги.")
+        }
+    }
+
+    override suspend fun getBookDetails(
+        editionId: String,
+    ): RepositoryResult<FreeBookDetails> {
+        val book = booksByEditionId[editionId]
+            ?: return RepositoryResult.Error("Откройте книгу ещё раз из Каталога.")
+
+        return try {
+            val fallback = Work(
+                id = book.workId,
+                title = book.title,
+                authors = book.authors,
+                coverId = book.coverId,
+                firstPublishYear = book.firstPublishYear,
+                editionCount = null,
+                editionLanguages = listOf(book.languageCode),
+                description = null,
+                subjects = emptyList(),
+                lastUpdatedAt = null,
+            )
+            val work = openLibraryApi.getWork(book.workId).toDomain(fallback = fallback)
+                ?: fallback
+            RepositoryResult.Success(
+                FreeBookDetails(
+                    book = book,
+                    description = work.description,
+                    subjects = work.subjects.take(MAX_DETAIL_SUBJECTS),
+                ),
+            )
+        } catch (exception: Throwable) {
+            if (exception is CancellationException) throw exception
+            RepositoryResult.Cached(
+                data = FreeBookDetails(
+                    book = book,
+                    description = null,
+                    subjects = emptyList(),
+                ),
+                message = "Подробное описание пока не загрузилось.",
+            )
         }
     }
 
@@ -81,9 +134,29 @@ class DefaultFreeBookRepository(
             val downloadableIdentifiers = response.response.docs
                 .mapNotNull { it.identifier?.trim()?.takeIf(String::isNotEmpty) }
                 .toSet()
-            RepositoryResult.Success(
-                books.filter { it.archiveIdentifier in downloadableIdentifiers },
-            )
+            val verifiedBooks = coroutineScope {
+                books
+                    .filter { it.archiveIdentifier in downloadableIdentifiers }
+                    .map { book ->
+                        async {
+                            runCatching {
+                                val epub = internetArchiveApi
+                                    .getFiles(book.archiveIdentifier)
+                                    .selectDownloadableEpub()
+                                    ?: return@runCatching null
+                                book.copy(
+                                    epubFileName = epub.name,
+                                    epubSizeBytes = epub.size?.toLongOrNull(),
+                                ).also { verified ->
+                                    booksByEditionId[verified.editionId] = verified
+                                }
+                            }.getOrNull()
+                        }
+                    }
+                    .awaitAll()
+                    .filterNotNull()
+            }
+            RepositoryResult.Success(verifiedBooks)
         } catch (exception: Throwable) {
             if (exception is CancellationException) throw exception
             RepositoryResult.Error("Не удалось проверить доступность EPUB-файлов.")
@@ -95,18 +168,10 @@ class DefaultFreeBookRepository(
             downloadDirectory.mkdirs()
             val temporaryFile = File(downloadDirectory, "${UUID.randomUUID()}.epub")
             try {
-                val metadata = internetArchiveApi.getMetadata(book.archiveIdentifier)
-                val epub = metadata.files
-                    .asSequence()
-                    .filter { it.format?.contains("EPUB", ignoreCase = true) == true }
-                    .filter { it.name?.endsWith(".epub", ignoreCase = true) == true }
-                    .filter { file -> file.size?.toLongOrNull()?.let { it <= MAX_EPUB_BYTES } != false }
-                    .minByOrNull { it.size?.toLongOrNull() ?: Long.MAX_VALUE }
+                val fileName = book.epubFileName
                     ?: return@withContext RepositoryResult.Error(
-                        "У источника сейчас нет EPUB-файла для этого издания.",
+                        "EPUB этого издания не прошёл проверку доступности.",
                     )
-                val fileName = epub.name
-                    ?: return@withContext RepositoryResult.Error("Источник не вернул имя EPUB-файла.")
                 val downloadUrl = "https://archive.org".toHttpUrl().newBuilder()
                     .addPathSegment("download")
                     .addPathSegment(book.archiveIdentifier)
@@ -189,11 +254,20 @@ class DefaultFreeBookRepository(
         else -> this
     }
 
+    private fun com.kliuchko.archive17.data.networking.dto.InternetArchiveFilesDto
+        .selectDownloadableEpub(): InternetArchiveFileDto? = result
+        .asSequence()
+        .filter { it.format?.contains("EPUB", ignoreCase = true) == true }
+        .filter { it.name?.endsWith(".epub", ignoreCase = true) == true }
+        .filter { file -> file.size?.toLongOrNull()?.let { it <= MAX_EPUB_BYTES } == true }
+        .minByOrNull { it.size?.toLongOrNull() ?: Long.MAX_VALUE }
+
     private companion object {
         const val MIN_SEARCH_QUERY_LENGTH = 2
         const val MAX_EPUB_BYTES = 50L * 1024L * 1024L
         const val SOURCE_NAME = "Open Library · Internet Archive"
         const val STARTER_CATALOG_QUERY = "subject:fiction"
+        const val MAX_DETAIL_SUBJECTS = 6
         val ISO_639_2_PATTERN = Regex("[a-z]{3}")
         val ARCHIVE_IDENTIFIER_PATTERN = Regex("[A-Za-z0-9._-]+")
     }

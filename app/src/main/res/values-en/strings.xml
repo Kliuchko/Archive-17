@@ -118,10 +118,12 @@
     <string name="open_book_failed">Could not open the book</string>
     <string name="catalog_free_filter">Free to read</string>
     <string name="catalog_all_filter">All books</string>
-    <string name="catalog_book_language">Book language: %1$s</string>
+    <string name="catalog_book_language">Available in: %1$s</string>
+    <string name="catalog_language_scope">Originals and available translations in the selected language.</string>
     <string name="language_italian">Italiano</string>
     <string name="language_other">Selected language</string>
     <string name="public_access">Open access</string>
+    <string name="open_edition">Open edition</string>
     <string name="free_source">Open Library · Internet Archive</string>
     <string name="regional_rights_notice">The source marks this edition as openly accessible. Rights for a specific edition may depend on the country.</string>
     <string name="download_to_shelf">Add to Shelf</string>
@@ -136,6 +138,14 @@
     <string name="source_label">Source</string>
     <string name="public_access_details">The open-access status is provided by the source. Check the source page for the terms and rights applying to this edition.</string>
     <string name="open_source_page">Open source page</string>
+    <string name="edition_language_label">Available edition language</string>
+    <string name="epub_format">EPUB</string>
+    <string name="catalog_topics">Topics</string>
+    <string name="more_details">Details</string>
+    <string name="other_open_editions">Other open editions</string>
+    <string name="other_open_editions_body">The source marks these editions as open. A suitable EPUB for the Shelf has not been confirmed yet, but the book can be checked at the source.</string>
+    <string name="epub_not_confirmed_short">Shelf-ready EPUB not confirmed yet</string>
+    <string name="epub_not_confirmed_details">The source marks this edition as open, but Archive 17 has not yet confirmed an EPUB with a suitable language and size. You can open the book at the source.</string>
     <string name="access_label">Access</string>
     <string name="book_language_label">Book language</string>
 </resources>

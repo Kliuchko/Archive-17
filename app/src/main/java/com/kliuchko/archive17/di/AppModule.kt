@@ -17,6 +17,7 @@ import com.kliuchko.archive17.domain.repository.FreeBookRepository
 import com.kliuchko.archive17.domain.repository.LocalBookRepository
 import com.kliuchko.archive17.domain.repository.LanguageSettingsRepository
 import com.kliuchko.archive17.presentation.details.BookDetailsViewModel
+import com.kliuchko.archive17.presentation.freedetails.FreeBookDetailsViewModel
 import com.kliuchko.archive17.presentation.library.LibraryViewModel
 import com.kliuchko.archive17.presentation.localdetails.LocalBookDetailsViewModel
 import com.kliuchko.archive17.presentation.search.SearchViewModel
@@ -138,6 +139,13 @@ val appModule = module {
     viewModel { parameters ->
         BookDetailsViewModel(
             workId = parameters.get(),
+            repository = get(),
+        )
+    }
+
+    viewModel { parameters ->
+        FreeBookDetailsViewModel(
+            editionId = parameters.get(),
             repository = get(),
         )
     }

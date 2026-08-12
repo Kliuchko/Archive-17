@@ -217,6 +217,7 @@ private class FakeOpenLibraryApi : OpenLibraryApi {
         query: String,
         fields: String,
         limit: Int,
+        page: Int,
         language: String,
     ): OpenLibrarySearchResponseDto {
         searchCallCount += 1

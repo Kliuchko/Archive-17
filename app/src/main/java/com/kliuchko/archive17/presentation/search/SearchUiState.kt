@@ -14,6 +14,7 @@ data class SearchUiState(
     val isCheckingFreeBooks: Boolean = false,
     val books: List<Work> = emptyList(),
     val freeBooks: List<FreeBook> = emptyList(),
+    val otherFreeBooks: List<FreeBook> = emptyList(),
     val selectedMode: CatalogMode = CatalogMode.FREE,
     val bookLanguageCode: String = "eng",
     val downloadingBookId: String? = null,
@@ -30,7 +31,8 @@ data class SearchUiState(
             !isLoading &&
             errorMessage == null &&
             books.isEmpty() &&
-            freeBooks.isEmpty()
+            freeBooks.isEmpty() &&
+            otherFreeBooks.isEmpty()
 
     companion object {
         const val MIN_QUERY_LENGTH = 2
