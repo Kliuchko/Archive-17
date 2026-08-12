@@ -11,14 +11,21 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.platform.ComposeView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.fragment.app.commitNow
@@ -31,6 +38,7 @@ import com.kliuchko.archive17.domain.repository.LocalBookRepository
 import com.kliuchko.archive17.presentation.theme.Archive17Theme
 import java.io.File
 import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 import org.json.JSONObject
 import org.koin.android.ext.android.inject
@@ -38,6 +46,7 @@ import org.readium.r2.navigator.epub.EpubNavigatorFactory
 import org.readium.r2.navigator.epub.EpubNavigatorFragment
 import org.readium.r2.shared.ExperimentalReadiumApi
 import org.readium.r2.shared.publication.Locator
+import org.readium.r2.shared.publication.services.positions
 import org.readium.r2.shared.util.AbsoluteUrl
 
 @OptIn(ExperimentalReadiumApi::class, kotlinx.coroutines.FlowPreview::class)
@@ -49,6 +58,9 @@ class EpubReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener {
     private lateinit var titleView: ComposeView
     private var navigator: EpubNavigatorFragment? = null
     private var openedPublication: org.readium.r2.shared.publication.Publication? = null
+    private var readerTitle by mutableStateOf("")
+    private var pageLabel by mutableStateOf("")
+    private var totalPositions = 0
 
     override fun onCreate(savedInstanceState: Bundle?) {
         supportFragmentManager.fragmentFactory = EpubNavigatorFragment.createDummyFactory()
@@ -72,6 +84,7 @@ class EpubReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener {
                 showTitle(book.title)
                 val publication = readiumService.open(File(book.filePath))
                 openedPublication = publication
+                totalPositions = runCatching { publication.positions().size }.getOrDefault(0)
                 val initialLocator = book.progressionJson?.let {
                     runCatching { Locator.fromJSON(JSONObject(it)) }.getOrNull()
                 }
@@ -91,6 +104,7 @@ class EpubReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener {
                 }
                 navigator = supportFragmentManager.findFragmentByTag(NAVIGATOR_TAG)
                     as EpubNavigatorFragment
+                navigator?.currentLocator?.value?.let(::updatePageLabel)
                 observeProgression(bookId)
             } catch (_: Throwable) {
                 showTitle(getString(R.string.open_book_failed))
@@ -116,6 +130,7 @@ class EpubReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener {
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.RESUMED) {
                 navigator?.currentLocator
+                    ?.onEach(::updatePageLabel)
                     ?.debounce(500)
                     ?.collect { locator ->
                         localBookRepository.saveProgression(bookId, locator.toJSON().toString())
@@ -157,10 +172,6 @@ class EpubReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener {
             ),
         )
         setContentView(root)
-        showTitle(getString(R.string.opening_book))
-    }
-
-    private fun showTitle(title: String) {
         titleView.setContent {
             Archive17Theme {
                 Surface(color = MaterialTheme.colorScheme.surface) {
@@ -168,22 +179,68 @@ class EpubReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener {
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(horizontal = 8.dp, vertical = 4.dp),
-                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(2.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         TextButton(onClick = onBackPressedDispatcher::onBackPressed) {
                             Text(getString(R.string.back))
                         }
                         Text(
-                            text = title,
+                            text = readerTitle,
                             modifier = Modifier.weight(1f),
                             style = MaterialTheme.typography.titleMedium,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                         )
+                        if (pageLabel.isNotEmpty()) {
+                            Text(
+                                text = pageLabel,
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                            )
+                        }
+                        IconButton(
+                            onClick = { navigator?.goBackward(animated = true) },
+                            modifier = Modifier.semantics {
+                                contentDescription = getString(R.string.reader_previous_page)
+                            },
+                        ) {
+                            Text(text = "‹", fontSize = 28.sp)
+                        }
+                        IconButton(
+                            onClick = { navigator?.goForward(animated = true) },
+                            modifier = Modifier.semantics {
+                                contentDescription = getString(R.string.reader_next_page)
+                            },
+                        ) {
+                            Text(text = "›", fontSize = 28.sp)
+                        }
                     }
                 }
             }
+        }
+        showTitle(getString(R.string.opening_book))
+    }
+
+    private fun showTitle(title: String) {
+        readerTitle = title
+    }
+
+    private fun updatePageLabel(locator: Locator) {
+        val position = locator.locations.position
+        pageLabel = when {
+            position != null && totalPositions > 0 -> getString(
+                R.string.reader_page_of,
+                position,
+                totalPositions,
+            )
+            position != null -> getString(R.string.reader_page, position)
+            locator.locations.totalProgression != null -> getString(
+                R.string.reader_progress,
+                (locator.locations.totalProgression!! * 100).toInt().coerceIn(0, 100),
+            )
+            else -> ""
         }
     }
 

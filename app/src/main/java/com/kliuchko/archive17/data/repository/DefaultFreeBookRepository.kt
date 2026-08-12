@@ -24,10 +24,13 @@ import java.io.InputStream
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
@@ -44,6 +47,9 @@ class DefaultFreeBookRepository(
 ) : FreeBookRepository {
     private val downloadDirectory = File(context.applicationContext.cacheDir, "free-book-downloads")
     private val booksByEditionId = ConcurrentHashMap<String, FreeBook>()
+    private val catalogCache = FreeBookCatalogCache(context)
+    private val catalogRefreshScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val refreshingCatalogPages = ConcurrentHashMap.newKeySet<String>()
 
     override suspend fun searchBooks(
         query: String,
@@ -58,14 +64,20 @@ class DefaultFreeBookRepository(
             return RepositoryResult.Error("Не удалось определить язык бесплатных книг.")
         }
 
+        if (normalizedQuery.isEmpty()) {
+            val primarySourceBooks = runCatching {
+                searchPrimarySourceBooks(normalizedQuery, languageCode, page)
+            }.getOrDefault(emptyList())
+            val cachedBooks = catalogCache.read(languageCode, page)
+            refreshStarterCatalog(languageCode, page)
+            val books = interleaveBooks(primarySourceBooks, cachedBooks)
+                .distinctBy(FreeBook::catalogTitleKey)
+            books.forEach { book -> booksByEditionId[book.editionId] = book }
+            return RepositoryResult.Success(books)
+        }
+
         val (openLibraryBooks, openLibraryError) = fetchBooksSafely {
-            val catalogQuery = normalizedQuery.ifBlank { STARTER_CATALOG_QUERY }
-            val searchQuery = "$catalogQuery ebook_access:public language:$languageCode"
-            openLibraryApi.searchFreeBooks(
-                query = searchQuery,
-                language = languageCode.toIso6391(),
-                page = page.coerceAtLeast(1),
-            ).toFreeBooks(expectedLanguageCode = languageCode)
+            fetchOpenLibraryBooks(normalizedQuery, languageCode, page)
         }
         val (primarySourceBooks, primarySourceError) = fetchBooksSafely {
             searchPrimarySourceBooks(normalizedQuery, languageCode, page)
@@ -286,6 +298,38 @@ class DefaultFreeBookRepository(
         RUSSIAN_LANGUAGE -> searchWikisourceBooks(query, page)
         ENGLISH_LANGUAGE -> curatedEnglishStandardEbooks(query, page)
         else -> emptyList()
+    }
+
+    private suspend fun fetchOpenLibraryBooks(
+        query: String,
+        languageCode: String,
+        page: Int,
+    ): List<FreeBook> {
+        val catalogQuery = query.ifBlank { STARTER_CATALOG_QUERY }
+        val searchQuery = "$catalogQuery ebook_access:public language:$languageCode"
+        return openLibraryApi.searchFreeBooks(
+            query = searchQuery,
+            language = languageCode.toIso6391(),
+            page = page.coerceAtLeast(1),
+        ).toFreeBooks(expectedLanguageCode = languageCode)
+    }
+
+    private fun refreshStarterCatalog(languageCode: String, page: Int) {
+        val safePage = page.coerceAtLeast(1)
+        if (!catalogCache.shouldRefresh(languageCode, safePage, System.currentTimeMillis())) return
+        val refreshKey = "$languageCode:$safePage"
+        if (!refreshingCatalogPages.add(refreshKey)) return
+
+        catalogRefreshScope.launch {
+            try {
+                val books = fetchOpenLibraryBooks("", languageCode, safePage)
+                catalogCache.write(languageCode, safePage, books, System.currentTimeMillis())
+            } catch (exception: Throwable) {
+                if (exception is CancellationException) throw exception
+            } finally {
+                refreshingCatalogPages.remove(refreshKey)
+            }
+        }
     }
 
     private suspend fun searchWikisourceBooks(

@@ -116,6 +116,11 @@
     <string name="updating">Updating</string>
     <string name="opening_book">Opening book…</string>
     <string name="open_book_failed">Could not open the book</string>
+    <string name="reader_previous_page">Previous page</string>
+    <string name="reader_next_page">Next page</string>
+    <string name="reader_page_of">%1$d / %2$d</string>
+    <string name="reader_page">Page %1$d</string>
+    <string name="reader_progress">%1$d%%</string>
     <string name="catalog_free_filter">Free to read</string>
     <string name="catalog_all_filter">All books</string>
     <string name="catalog_book_language">Available in: %1$s</string>

@@ -116,6 +116,11 @@
     <string name="updating">Обновление</string>
     <string name="opening_book">Открываем книгу…</string>
     <string name="open_book_failed">Не удалось открыть книгу</string>
+    <string name="reader_previous_page">Предыдущая страница</string>
+    <string name="reader_next_page">Следующая страница</string>
+    <string name="reader_page_of">%1$d / %2$d</string>
+    <string name="reader_page">Страница %1$d</string>
+    <string name="reader_progress">%1$d%%</string>
     <string name="catalog_free_filter">Можно читать бесплатно</string>
     <string name="catalog_all_filter">Все книги</string>
     <string name="catalog_book_language">Доступно на языке: %1$s</string>
