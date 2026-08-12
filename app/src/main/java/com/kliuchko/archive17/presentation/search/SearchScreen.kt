@@ -22,9 +22,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.kliuchko.archive17.R
 import com.kliuchko.archive17.domain.model.Work
 import com.kliuchko.archive17.presentation.components.ArchiveBrand
 import com.kliuchko.archive17.presentation.components.BookCover
@@ -48,11 +50,11 @@ fun SearchScreen(
         ArchiveBrand()
         Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
             Text(
-                text = "Каталог",
+                text = stringResource(R.string.catalog_title),
                 style = MaterialTheme.typography.headlineMedium,
             )
             Text(
-                text = "Что будем читать?",
+                text = stringResource(R.string.catalog_question),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -64,7 +66,7 @@ fun SearchScreen(
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
             shape = RoundedCornerShape(14.dp),
-            label = { Text(text = "Название или автор") },
+            label = { Text(text = stringResource(R.string.search_hint)) },
             leadingIcon = {
                 Text(
                     text = "⌕",
@@ -103,7 +105,7 @@ private fun SearchResults(
 
         uiState.errorMessage != null -> {
             EmptyMessage(
-                title = "Каталог временно недоступен",
+                title = stringResource(R.string.catalog_unavailable),
                 body = uiState.errorMessage,
                 modifier = modifier,
             )
@@ -111,16 +113,16 @@ private fun SearchResults(
 
         uiState.showMinimumQueryState -> {
             EmptyMessage(
-                title = "Нужно ещё немного",
-                body = "Введите не меньше двух символов.",
+                title = stringResource(R.string.minimum_query_title),
+                body = stringResource(R.string.minimum_query_body),
                 modifier = modifier,
             )
         }
 
         uiState.showEmptyState -> {
             EmptyMessage(
-                title = "Ничего не найдено",
-                body = "Попробуйте изменить название или имя автора.",
+                title = stringResource(R.string.nothing_found),
+                body = stringResource(R.string.nothing_found_body),
                 modifier = modifier,
             )
         }
@@ -179,7 +181,7 @@ private fun SearchResultCard(
                     overflow = TextOverflow.Ellipsis,
                 )
                 Text(
-                    text = work.authors.joinToString().ifBlank { "Автор не указан" },
+                    text = work.authors.joinToString().ifBlank { stringResource(R.string.author_unknown) },
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
@@ -194,7 +196,7 @@ private fun SearchResultCard(
                 )
             }
             Text(
-                text = "Открыть",
+                text = stringResource(R.string.open),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.primary,
             )
@@ -219,26 +221,29 @@ private fun CatalogWelcome(
                 verticalArrangement = Arrangement.spacedBy(6.dp),
             ) {
                 Text(
-                    text = "Найдите новую книгу",
+                    text = stringResource(R.string.find_new_book),
                     style = MaterialTheme.typography.titleLarge,
                 )
                 Text(
-                    text = "Сейчас Archive 17 ищет книги по названию и автору. Полные бесплатные тексты и фильтр доступа появятся на следующем этапе.",
+                    text = stringResource(R.string.catalog_welcome_body),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
         }
         Text(
-            text = "БЕСПЛАТНЫЕ КНИГИ · СКОРО",
+            text = stringResource(R.string.free_books_soon),
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.primary,
         )
     }
 }
 
+@Composable
 private fun Work.metadataLine(): String {
     val published = firstPublishYear?.let { "$it" }
-    val editions = editionCount?.let { "изданий: $it" }
-    return listOfNotNull(published, editions).joinToString(" · ").ifBlank { "Сведения об издании уточняются" }
+    val editions = editionCount?.let { stringResource(R.string.edition_count, it) }
+    return listOfNotNull(published, editions)
+        .joinToString(" · ")
+        .ifBlank { stringResource(R.string.edition_details_pending) }
 }

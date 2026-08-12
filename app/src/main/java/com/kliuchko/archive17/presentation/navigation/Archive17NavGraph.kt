@@ -11,6 +11,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
+import androidx.annotation.StringRes
+import com.kliuchko.archive17.R
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
@@ -31,15 +34,15 @@ import com.kliuchko.archive17.presentation.search.SearchScreen
 
 private data class TopLevelDestination(
     val destination: Archive17Destination,
-    val label: String,
+    @StringRes val labelRes: Int,
     val icon: ArchiveNavIcon,
 )
 
 private val topLevelDestinations = listOf(
-    TopLevelDestination(Archive17Destination.Home, "Главная", ArchiveNavIcon.HOME),
-    TopLevelDestination(Archive17Destination.Search, "Каталог", ArchiveNavIcon.SEARCH),
-    TopLevelDestination(Archive17Destination.Library, "Полка", ArchiveNavIcon.SHELF),
-    TopLevelDestination(Archive17Destination.Profile, "Профиль", ArchiveNavIcon.PROFILE),
+    TopLevelDestination(Archive17Destination.Home, R.string.nav_home, ArchiveNavIcon.HOME),
+    TopLevelDestination(Archive17Destination.Search, R.string.nav_catalog, ArchiveNavIcon.SEARCH),
+    TopLevelDestination(Archive17Destination.Library, R.string.nav_shelf, ArchiveNavIcon.SHELF),
+    TopLevelDestination(Archive17Destination.Profile, R.string.nav_profile, ArchiveNavIcon.PROFILE),
 )
 
 @Composable
@@ -185,7 +188,7 @@ private fun ArchiveBottomNavigation(
                 },
                 label = {
                     Text(
-                        text = item.label,
+                        text = stringResource(item.labelRes),
                         style = MaterialTheme.typography.labelSmall,
                     )
                 },

@@ -27,11 +27,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.kliuchko.archive17.R
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.kliuchko.archive17.domain.model.ReadingStatus
 import com.kliuchko.archive17.presentation.components.LocalBookCover
-import com.kliuchko.archive17.presentation.details.displayName
+import com.kliuchko.archive17.presentation.components.localizedDisplayName
 import org.koin.androidx.compose.koinViewModel
 import org.koin.core.parameter.parametersOf
 
@@ -63,9 +65,9 @@ fun LocalBookDetailsScreen(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            OutlinedButton(onClick = onBackClick) { Text("Назад") }
+            OutlinedButton(onClick = onBackClick) { Text(stringResource(R.string.back)) }
             Text(
-                text = "МОЙ ФАЙЛ",
+                text = stringResource(R.string.my_file),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.primary,
             )
@@ -80,7 +82,7 @@ fun LocalBookDetailsScreen(
             ) { CircularProgressIndicator() }
 
             uiState.book == null -> Text(
-                text = uiState.errorMessage ?: "Книга недоступна.",
+                text = uiState.errorMessage ?: stringResource(R.string.book_unavailable),
                 style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.error,
             )
@@ -104,13 +106,13 @@ fun LocalBookDetailsScreen(
                         textAlign = TextAlign.Center,
                     )
                     Text(
-                        text = book.author ?: "Автор не указан",
+                        text = book.author ?: stringResource(R.string.author_unknown),
                         style = MaterialTheme.typography.bodyLarge,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         textAlign = TextAlign.Center,
                     )
                     Text(
-                        text = "EPUB · доступно офлайн",
+                        text = stringResource(R.string.epub_offline),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -119,10 +121,16 @@ fun LocalBookDetailsScreen(
                 Button(
                     onClick = onReadClick,
                     modifier = Modifier.fillMaxWidth(),
-                ) { Text(if (book.progressionJson == null) "Читать" else "Вернуться к книге") }
+                ) {
+                    Text(
+                        stringResource(
+                            if (book.progressionJson == null) R.string.read else R.string.continue_book_plain,
+                        ),
+                    )
+                }
 
                 Text(
-                    text = "Статус на Полке",
+                    text = stringResource(R.string.shelf_status),
                     style = MaterialTheme.typography.titleMedium,
                 )
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -131,7 +139,7 @@ fun LocalBookDetailsScreen(
                             selected = book.readingStatus == status,
                             onClick = { viewModel.updateStatus(status) },
                             enabled = !uiState.isSaving,
-                            label = { Text(status.displayName()) },
+                            label = { Text(status.localizedDisplayName()) },
                         )
                     }
                 }
@@ -140,14 +148,14 @@ fun LocalBookDetailsScreen(
                     onClick = { showEditDialog = true },
                     enabled = !uiState.isSaving,
                     modifier = Modifier.fillMaxWidth(),
-                ) { Text("Изменить название и автора") }
+                ) { Text(stringResource(R.string.edit_book_metadata)) }
 
                 TextButton(
                     onClick = { showDeleteDialog = true },
                     enabled = !uiState.isSaving,
                     modifier = Modifier.fillMaxWidth(),
                 ) {
-                    Text("Убрать с Полки", color = MaterialTheme.colorScheme.error)
+                    Text(stringResource(R.string.remove_from_shelf), color = MaterialTheme.colorScheme.error)
                 }
 
                 uiState.message?.let {
@@ -175,18 +183,18 @@ fun LocalBookDetailsScreen(
         if (showDeleteDialog) {
             AlertDialog(
                 onDismissRequest = { showDeleteDialog = false },
-                title = { Text("Убрать книгу с Полки?") },
+                title = { Text(stringResource(R.string.remove_book_title)) },
                 text = {
-                    Text("Внутренняя копия EPUB и прогресс чтения будут удалены. Исходный файл на устройстве останется без изменений.")
+                    Text(stringResource(R.string.remove_book_message))
                 },
                 confirmButton = {
                     TextButton(onClick = {
                         showDeleteDialog = false
                         viewModel.deleteBook()
-                    }) { Text("Удалить", color = MaterialTheme.colorScheme.error) }
+                    }) { Text(stringResource(R.string.delete), color = MaterialTheme.colorScheme.error) }
                 },
                 dismissButton = {
-                    TextButton(onClick = { showDeleteDialog = false }) { Text("Отмена") }
+                    TextButton(onClick = { showDeleteDialog = false }) { Text(stringResource(R.string.cancel)) }
                 },
             )
         }
@@ -204,28 +212,28 @@ private fun EditMetadataDialog(
     var author by remember(initialAuthor) { mutableStateOf(initialAuthor) }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Сведения о книге") },
+        title = { Text(stringResource(R.string.book_information)) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 OutlinedTextField(
                     value = title,
                     onValueChange = { title = it },
-                    label = { Text("Название") },
+                    label = { Text(stringResource(R.string.book_title)) },
                     singleLine = true,
                 )
                 OutlinedTextField(
                     value = author,
                     onValueChange = { author = it },
-                    label = { Text("Автор") },
+                    label = { Text(stringResource(R.string.book_author)) },
                     singleLine = true,
                 )
             }
         },
         confirmButton = {
             TextButton(onClick = { onSave(title, author.takeIf(String::isNotBlank)) }) {
-                Text("Сохранить")
+                Text(stringResource(R.string.save))
             }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Отмена") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) } },
     )
 }

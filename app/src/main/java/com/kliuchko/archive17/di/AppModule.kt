@@ -9,12 +9,15 @@ import com.kliuchko.archive17.data.networking.api.OpenLibraryApi
 import com.kliuchko.archive17.data.repository.DefaultBookRepository
 import com.kliuchko.archive17.data.reader.ReadiumService
 import com.kliuchko.archive17.data.repository.DefaultLocalBookRepository
+import com.kliuchko.archive17.data.repository.DefaultLanguageSettingsRepository
 import com.kliuchko.archive17.domain.repository.BookRepository
 import com.kliuchko.archive17.domain.repository.LocalBookRepository
+import com.kliuchko.archive17.domain.repository.LanguageSettingsRepository
 import com.kliuchko.archive17.presentation.details.BookDetailsViewModel
 import com.kliuchko.archive17.presentation.library.LibraryViewModel
 import com.kliuchko.archive17.presentation.localdetails.LocalBookDetailsViewModel
 import com.kliuchko.archive17.presentation.search.SearchViewModel
+import com.kliuchko.archive17.presentation.profile.ProfileViewModel
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
 import org.koin.android.ext.koin.androidContext
@@ -91,6 +94,10 @@ val appModule = module {
         )
     }
 
+    single<LanguageSettingsRepository> {
+        DefaultLanguageSettingsRepository(androidContext())
+    }
+
     viewModel {
         SearchViewModel(repository = get())
     }
@@ -115,4 +122,6 @@ val appModule = module {
             repository = get(),
         )
     }
+
+    viewModel { ProfileViewModel(languageSettingsRepository = get()) }
 }

@@ -13,8 +13,10 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.kliuchko.archive17.R
 import com.kliuchko.archive17.presentation.components.ArchiveSeal
 
 @Composable
@@ -30,17 +32,17 @@ fun WelcomeScreen(
         horizontalAlignment = Alignment.Start,
     ) {
         Text(
-            text = "ЧИТАТЕЛЬСКИЙ БИЛЕТ №17",
+            text = stringResource(R.string.welcome_ticket),
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.primary,
         )
         Text(
-            text = "Archive 17",
+            text = stringResource(R.string.app_name),
             modifier = Modifier.padding(top = 8.dp),
             style = MaterialTheme.typography.displayLarge,
         )
         Text(
-            text = "Место, где остаются истории.",
+            text = stringResource(R.string.welcome_place),
             modifier = Modifier.padding(top = 4.dp),
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -55,7 +57,7 @@ fun WelcomeScreen(
         ) {
             ArchiveSeal()
             Text(
-                text = "Все истории где-то хранятся.",
+                text = stringResource(R.string.welcome_stories),
                 modifier = Modifier.padding(top = 24.dp),
                 style = MaterialTheme.typography.titleMedium,
                 textAlign = TextAlign.Center,
@@ -67,10 +69,10 @@ fun WelcomeScreen(
             onClick = onEnter,
             modifier = Modifier.fillMaxWidth(),
         ) {
-            Text(text = "Войти")
+            Text(text = stringResource(R.string.enter))
         }
         Text(
-            text = "Профиль можно создать позже",
+            text = stringResource(R.string.profile_later),
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(top = 12.dp),

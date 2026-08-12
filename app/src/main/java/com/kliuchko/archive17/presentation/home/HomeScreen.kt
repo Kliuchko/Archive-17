@@ -24,12 +24,13 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.res.stringResource
+import com.kliuchko.archive17.R
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.kliuchko.archive17.domain.model.LibraryBook
 import com.kliuchko.archive17.domain.model.LocalBook
@@ -61,7 +62,7 @@ fun HomeScreen(
             .filter { it.readingStatus == ReadingStatus.READING }
             .forEach { add(CurrentBook.Local(it)) }
     }.sortedByDescending(CurrentBook::updatedAt)
-    val greeting = remember { greetingForHour(LocalTime.now().hour) }
+    val greeting = greetingForHour(LocalTime.now().hour)
 
     LazyColumn(
         modifier = modifier.fillMaxSize(),
@@ -92,7 +93,7 @@ fun HomeScreen(
         item {
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(
-                    text = "АРХИВ ОТКРЫТ",
+                    text = stringResource(R.string.archive_open),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.primary,
                 )
@@ -132,8 +133,8 @@ fun HomeScreen(
 
         item {
             SectionHeading(
-                title = "Залы Архива",
-                trailing = "Все направления",
+                title = stringResource(R.string.archive_halls),
+                trailing = stringResource(R.string.all_directions),
             )
         }
 
@@ -144,31 +145,31 @@ fun HomeScreen(
             ) {
                 item {
                     HallCard(
-                        title = "Бесплатные книги",
-                        eyebrow = "ОТКРЫТЫЙ ФОНД",
-                        subtitle = "Искать в каталоге",
+                        title = stringResource(R.string.free_books),
+                        eyebrow = stringResource(R.string.open_collection),
+                        subtitle = stringResource(R.string.search_catalog),
                         onClick = onCatalogClick,
                     )
                 }
                 item {
                     HallCard(
-                        title = "По подписке",
-                        eyebrow = "ЧИТАЛЬНЫЙ ЗАЛ",
-                        subtitle = "Скоро",
+                        title = stringResource(R.string.by_subscription),
+                        eyebrow = stringResource(R.string.reading_room),
+                        subtitle = stringResource(R.string.soon),
                     )
                 }
                 item {
                     HallCard(
-                        title = "Авторские книги",
-                        eyebrow = "НОВЫЕ ИМЕНА",
-                        subtitle = "Скоро",
+                        title = stringResource(R.string.author_books),
+                        eyebrow = stringResource(R.string.new_names),
+                        subtitle = stringResource(R.string.soon),
                     )
                 }
                 item {
                     HallCard(
                         title = "Archive 17",
-                        eyebrow = "ОРИГИНАЛ АРХИВА",
-                        subtitle = "Скоро",
+                        eyebrow = stringResource(R.string.archive_original),
+                        subtitle = stringResource(R.string.soon),
                         emphasized = true,
                     )
                 }
@@ -177,12 +178,12 @@ fun HomeScreen(
 
         item {
             Text(
-                text = "ДОКУМЕНТ 01",
+                text = stringResource(R.string.document_01),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.primary,
             )
             Text(
-                text = "Archive 17 растёт вокруг книг: спокойно, бережно и без помех для чтения.",
+                text = stringResource(R.string.document_message),
                 modifier = Modifier.padding(top = 6.dp),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -234,7 +235,7 @@ private fun ContinueReadingCard(
                 verticalArrangement = Arrangement.spacedBy(5.dp),
             ) {
                 Text(
-                    text = "ВЫ ОСТАНОВИЛИСЬ ЗДЕСЬ",
+                    text = stringResource(R.string.stopped_here),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.primary,
                 )
@@ -245,14 +246,14 @@ private fun ContinueReadingCard(
                     overflow = TextOverflow.Ellipsis,
                 )
                 Text(
-                    text = book.work.authors.joinToString().ifBlank { "Автор не указан" },
+                    text = book.work.authors.joinToString().ifBlank { stringResource(R.string.author_unknown) },
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
                 Text(
-                    text = "Вернуться к книге →",
+                    text = stringResource(R.string.continue_book),
                     modifier = Modifier.padding(top = 5.dp),
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.primary,
@@ -290,7 +291,7 @@ private fun ContinueReadingLocalBookCard(
                 verticalArrangement = Arrangement.spacedBy(5.dp),
             ) {
                 Text(
-                    text = "ВЫ ОСТАНОВИЛИСЬ ЗДЕСЬ",
+                    text = stringResource(R.string.stopped_here),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.primary,
                 )
@@ -301,14 +302,14 @@ private fun ContinueReadingLocalBookCard(
                     overflow = TextOverflow.Ellipsis,
                 )
                 Text(
-                    text = book.author ?: "Автор не указан",
+                    text = book.author ?: stringResource(R.string.author_unknown),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
                 Text(
-                    text = "Вернуться к книге →",
+                    text = stringResource(R.string.continue_book),
                     modifier = Modifier.padding(top = 5.dp),
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.primary,
@@ -335,16 +336,16 @@ private fun EmptyReadingRoom(
             verticalArrangement = Arrangement.spacedBy(7.dp),
         ) {
             Text(
-                text = "В читальном зале пока тихо",
+                text = stringResource(R.string.reading_room_quiet),
                 style = MaterialTheme.typography.titleLarge,
             )
             Text(
-                text = "Найдите книгу в каталоге и поместите её в архив.",
+                text = stringResource(R.string.reading_room_invitation),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Text(
-                text = "Открыть каталог →",
+                text = stringResource(R.string.open_catalog),
                 modifier = Modifier.padding(top = 5.dp),
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.primary,
@@ -402,17 +403,19 @@ private fun HallCard(
     }
 }
 
+@Composable
 private fun readingRoomMessage(count: Int): String =
     when (count) {
-        0 -> "Здесь появятся книги, к которым захочется вернуться."
-        1 -> "В читальном зале осталась одна незавершённая книга."
-        else -> "В читальном зале осталось незавершённых книг: $count."
+        0 -> stringResource(R.string.reading_room_empty_message)
+        1 -> stringResource(R.string.reading_room_one)
+        else -> stringResource(R.string.reading_room_many, count)
     }
 
+@Composable
 private fun greetingForHour(hour: Int): String =
     when (hour) {
-        in 5..11 -> "Доброе утро"
-        in 12..17 -> "Добрый день"
-        in 18..23 -> "Добрый вечер"
-        else -> "Доброй ночи"
+        in 5..11 -> stringResource(R.string.greeting_morning)
+        in 12..17 -> stringResource(R.string.greeting_day)
+        in 18..23 -> stringResource(R.string.greeting_evening)
+        else -> stringResource(R.string.greeting_night)
     }

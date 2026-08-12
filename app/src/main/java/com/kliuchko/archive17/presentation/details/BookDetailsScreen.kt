@@ -23,12 +23,15 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.kliuchko.archive17.R
 import com.kliuchko.archive17.data.networking.CoverSize
 import com.kliuchko.archive17.domain.model.ReadingStatus
 import com.kliuchko.archive17.presentation.components.BookCover
+import com.kliuchko.archive17.presentation.components.localizedDisplayName
 import org.koin.androidx.compose.koinViewModel
 import org.koin.core.parameter.parametersOf
 
@@ -54,10 +57,12 @@ fun BookDetailsScreen(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             OutlinedButton(onClick = onBackClick) {
-                Text(text = "Назад")
+                Text(text = stringResource(R.string.back))
             }
             Text(
-                text = if (uiState.selectedStatus == null) "КАТАЛОГ" else "В АРХИВЕ",
+                text = stringResource(
+                    if (uiState.selectedStatus == null) R.string.catalog_uppercase else R.string.in_archive_uppercase,
+                ),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.primary,
             )
@@ -78,16 +83,16 @@ fun BookDetailsScreen(
             uiState.work == null -> {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Text(
-                        text = "Книга недоступна",
+                        text = stringResource(R.string.book_unavailable),
                         style = MaterialTheme.typography.headlineSmall,
                     )
                     Text(
-                        text = uiState.errorMessage ?: "Не удалось найти сохранённые сведения о книге.",
+                        text = uiState.errorMessage ?: stringResource(R.string.book_unavailable_details),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     Button(onClick = viewModel::refresh) {
-                        Text(text = "Повторить")
+                        Text(text = stringResource(R.string.retry))
                     }
                 }
             }
@@ -114,13 +119,13 @@ fun BookDetailsScreen(
                         textAlign = TextAlign.Center,
                     )
                     Text(
-                        text = work.authors.joinToString().ifBlank { "Автор не указан" },
+                        text = work.authors.joinToString().ifBlank { stringResource(R.string.author_unknown) },
                         style = MaterialTheme.typography.bodyLarge,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         textAlign = TextAlign.Center,
                     )
                     Text(
-                        text = work.firstPublishYear?.toString() ?: "Год издания не указан",
+                        text = work.firstPublishYear?.toString() ?: stringResource(R.string.year_unknown),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -133,7 +138,7 @@ fun BookDetailsScreen(
                     enabled = false,
                     modifier = Modifier.fillMaxWidth(),
                 ) {
-                    Text(text = "Читать · скоро")
+                    Text(text = stringResource(R.string.read_soon))
                 }
 
                 if (uiState.selectedStatus == null) {
@@ -142,11 +147,11 @@ fun BookDetailsScreen(
                         enabled = uiState.canSave,
                         modifier = Modifier.fillMaxWidth(),
                     ) {
-                        Text(text = "Поместить в архив")
+                        Text(text = stringResource(R.string.place_in_archive))
                     }
                 } else {
                     Text(
-                        text = "В архиве",
+                        text = stringResource(R.string.in_archive),
                         modifier = Modifier.fillMaxWidth(),
                         style = MaterialTheme.typography.labelLarge,
                         color = MaterialTheme.colorScheme.primary,
@@ -154,7 +159,7 @@ fun BookDetailsScreen(
                     )
                 }
 
-                DetailsSection(title = "Статус на Полке") {
+                DetailsSection(title = stringResource(R.string.shelf_status)) {
                     FlowRow(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -164,27 +169,28 @@ fun BookDetailsScreen(
                                 selected = uiState.selectedStatus == status,
                                 onClick = { viewModel.saveStatus(status) },
                                 enabled = uiState.canSave,
-                                label = { Text(text = status.displayName()) },
+                                label = { Text(text = status.localizedDisplayName()) },
                             )
                         }
                     }
                 }
 
-                DetailsSection(title = "О книге") {
+                DetailsSection(title = stringResource(R.string.about_book)) {
                     Text(
-                        text = work.description?.takeIf { it.isNotBlank() } ?: "Описание пока отсутствует.",
+                        text = work.description?.takeIf { it.isNotBlank() }
+                            ?: stringResource(R.string.description_missing),
                         style = MaterialTheme.typography.bodyMedium,
                     )
                 }
 
-                DetailsSection(title = "Язык издания") {
+                DetailsSection(title = stringResource(R.string.edition_language)) {
                     Text(
                         text = uiState.languageLabel,
                         style = MaterialTheme.typography.bodyMedium,
                     )
                 }
 
-                DetailsSection(title = "Темы") {
+                DetailsSection(title = stringResource(R.string.subjects)) {
                     SubjectList(subjects = work.subjects)
                 }
 
@@ -218,13 +224,13 @@ private fun StatusIndicators(
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         if (uiState.isCached) {
-            AssistChip(onClick = {}, label = { Text(text = "Сохранено локально") })
+            AssistChip(onClick = {}, label = { Text(text = stringResource(R.string.saved_locally)) })
         }
         if (uiState.isStale) {
-            AssistChip(onClick = {}, label = { Text(text = "Сведения могут быть устаревшими") })
+            AssistChip(onClick = {}, label = { Text(text = stringResource(R.string.details_may_be_stale)) })
         }
         if (uiState.isRefreshing) {
-            AssistChip(onClick = {}, label = { Text(text = "Обновление") })
+            AssistChip(onClick = {}, label = { Text(text = stringResource(R.string.updating)) })
         }
     }
 }
@@ -236,7 +242,7 @@ private fun SubjectList(
 ) {
     if (subjects.isEmpty()) {
         Text(
-            text = "Темы не указаны.",
+            text = stringResource(R.string.subjects_missing),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )

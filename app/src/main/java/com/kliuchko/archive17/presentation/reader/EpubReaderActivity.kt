@@ -20,11 +20,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.ComposeView
-import androidx.fragment.app.FragmentActivity
+import androidx.appcompat.app.AppCompatActivity
 import androidx.fragment.app.commitNow
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
+import com.kliuchko.archive17.R
 import com.kliuchko.archive17.data.reader.ReadiumService
 import com.kliuchko.archive17.domain.repository.LocalBookRepository
 import com.kliuchko.archive17.presentation.theme.Archive17Theme
@@ -40,7 +41,7 @@ import org.readium.r2.shared.publication.Locator
 import org.readium.r2.shared.util.AbsoluteUrl
 
 @OptIn(ExperimentalReadiumApi::class, kotlinx.coroutines.FlowPreview::class)
-class EpubReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
+class EpubReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener {
     private val localBookRepository: LocalBookRepository by inject()
     private val readiumService: ReadiumService by inject()
 
@@ -63,7 +64,7 @@ class EpubReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
         lifecycleScope.launch {
             val book = localBookRepository.getLocalBook(bookId)
             if (book == null || !File(book.filePath).exists()) {
-                showTitle("Книга недоступна")
+                showTitle(getString(R.string.book_unavailable))
                 return@launch
             }
 
@@ -92,7 +93,7 @@ class EpubReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
                     as EpubNavigatorFragment
                 observeProgression(bookId)
             } catch (_: Throwable) {
-                showTitle("Не удалось открыть книгу")
+                showTitle(getString(R.string.open_book_failed))
             }
         }
     }
@@ -156,7 +157,7 @@ class EpubReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
             ),
         )
         setContentView(root)
-        showTitle("Открываем книгу…")
+        showTitle(getString(R.string.opening_book))
     }
 
     private fun showTitle(title: String) {
@@ -171,7 +172,7 @@ class EpubReaderActivity : FragmentActivity(), EpubNavigatorFragment.Listener {
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         TextButton(onClick = onBackPressedDispatcher::onBackPressed) {
-                            Text("Назад")
+                            Text(getString(R.string.back))
                         }
                         Text(
                             text = title,

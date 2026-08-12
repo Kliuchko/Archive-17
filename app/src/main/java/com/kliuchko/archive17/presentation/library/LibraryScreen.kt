@@ -32,13 +32,15 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.res.stringResource
+import com.kliuchko.archive17.R
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.kliuchko.archive17.domain.model.LibraryBook
 import com.kliuchko.archive17.domain.model.LocalBook
 import com.kliuchko.archive17.presentation.components.ArchiveBrand
 import com.kliuchko.archive17.presentation.components.BookCover
 import com.kliuchko.archive17.presentation.components.LocalBookCover
-import com.kliuchko.archive17.presentation.details.displayName
+import com.kliuchko.archive17.presentation.components.localizedDisplayName
 import org.koin.androidx.compose.koinViewModel
 
 @Composable
@@ -79,7 +81,7 @@ fun LibraryScreen(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                Text(text = "Полка", style = MaterialTheme.typography.headlineMedium)
+                Text(text = stringResource(R.string.shelf_title), style = MaterialTheme.typography.headlineMedium)
                 Text(
                     text = shelfSubtitle(uiState.bookCount),
                     style = MaterialTheme.typography.bodyMedium,
@@ -87,7 +89,7 @@ fun LibraryScreen(
                 )
             }
             TextButton(onClick = openFilePicker, enabled = !uiState.isImporting) {
-                Text(if (uiState.isImporting) "Добавляем…" else "+ EPUB")
+                Text(stringResource(if (uiState.isImporting) R.string.adding else R.string.add_epub))
             }
         }
 
@@ -99,7 +101,7 @@ fun LibraryScreen(
                 FilterChip(
                     selected = uiState.selectedFilter == filter,
                     onClick = { viewModel.onFilterSelected(filter) },
-                    label = { Text(text = filter.displayName()) },
+                    label = { Text(text = filter.localizedDisplayName()) },
                 )
             }
         }
@@ -187,7 +189,7 @@ private fun ShelfBook(
             overflow = TextOverflow.Ellipsis,
         )
         Text(
-            text = book.entry.readingStatus.displayName(),
+            text = book.entry.readingStatus.localizedDisplayName(),
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.primary,
         )
@@ -217,7 +219,7 @@ private fun ShelfLocalBook(
             overflow = TextOverflow.Ellipsis,
         )
         Text(
-            text = book.readingStatus.displayName(),
+            text = book.readingStatus.localizedDisplayName(),
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.primary,
         )
@@ -246,21 +248,23 @@ private fun EmptyShelf(
                 verticalArrangement = Arrangement.spacedBy(7.dp),
             ) {
                 Text(
-                    text = if (selectedFilter == LibraryFilter.ALL) "На Полке пока пусто" else "В этом разделе пока пусто",
+                    text = stringResource(
+                        if (selectedFilter == LibraryFilter.ALL) R.string.shelf_empty else R.string.shelf_section_empty,
+                    ),
                     style = MaterialTheme.typography.titleLarge,
                 )
                 Text(
                     text = if (selectedFilter == LibraryFilter.ALL) {
-                        "Найдите книгу в каталоге или добавьте свой EPUB с устройства."
+                        stringResource(R.string.shelf_empty_body)
                     } else {
-                        "Измените статус книги или выберите другой раздел."
+                        stringResource(R.string.shelf_section_empty_body)
                     },
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 if (selectedFilter == LibraryFilter.ALL) {
                     Text(
-                        text = "Открыть каталог →",
+                        text = stringResource(R.string.open_catalog),
                         modifier = Modifier
                             .padding(top = 5.dp)
                             .clickable(onClick = onCatalogClick),
@@ -268,7 +272,9 @@ private fun EmptyShelf(
                         color = MaterialTheme.colorScheme.primary,
                     )
                     Text(
-                        text = if (isImporting) "ДОБАВЛЯЕМ…" else "ДОБАВИТЬ EPUB ИЗ ФАЙЛА →",
+                        text = stringResource(
+                            if (isImporting) R.string.adding_uppercase else R.string.add_epub_from_file,
+                        ),
                         modifier = Modifier
                             .padding(top = 8.dp)
                             .clickable(enabled = !isImporting, onClick = onImportClick),
@@ -281,10 +287,11 @@ private fun EmptyShelf(
     }
 }
 
+@Composable
 private fun shelfSubtitle(count: Int): String =
     when {
-        count == 0 -> "Ваше личное книжное пространство"
-        count % 10 == 1 && count % 100 != 11 -> "$count книга в архиве"
-        count % 10 in 2..4 && count % 100 !in 12..14 -> "$count книги в архиве"
-        else -> "$count книг в архиве"
+        count == 0 -> stringResource(R.string.shelf_personal_space)
+        count % 10 == 1 && count % 100 != 11 -> stringResource(R.string.shelf_count_one, count)
+        count % 10 in 2..4 && count % 100 !in 12..14 -> stringResource(R.string.shelf_count_few, count)
+        else -> stringResource(R.string.shelf_count_many, count)
     }
