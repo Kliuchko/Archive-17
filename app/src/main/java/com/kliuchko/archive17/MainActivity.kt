@@ -76,6 +76,6 @@ class MainActivity : AppCompatActivity() {
     private companion object {
         const val PREFERENCES_NAME = "archive17_preferences"
         const val KEY_HAS_ENTERED = "has_entered_archive"
-        const val SPLASH_DURATION_MILLIS = 900L
+        const val SPLASH_DURATION_MILLIS = 1_080L
     }
 }
