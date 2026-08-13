@@ -35,6 +35,17 @@ class FreeBookDetailsViewModel(
                 }
             }
         }
+        viewModelScope.launch {
+            when (val result = repository.getRelatedEditions(editionId)) {
+                is RepositoryResult.Success -> _uiState.update {
+                    it.copy(relatedEditions = result.data)
+                }
+                is RepositoryResult.Cached -> _uiState.update {
+                    it.copy(relatedEditions = result.data)
+                }
+                is RepositoryResult.Error -> Unit
+            }
+        }
     }
 
     fun downloadBook() {

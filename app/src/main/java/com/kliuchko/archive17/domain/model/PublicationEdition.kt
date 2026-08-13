@@ -31,6 +31,7 @@ data class EditionAccessOption(
 )
 
 enum class EditionAccessMode {
+    REFERENCE,
     FREE,
     SUBSCRIPTION,
     PURCHASE,

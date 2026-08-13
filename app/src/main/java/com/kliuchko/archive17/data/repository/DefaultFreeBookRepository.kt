@@ -15,6 +15,7 @@ import com.kliuchko.archive17.data.networking.mapper.curatedRussianWikisourceBoo
 import com.kliuchko.archive17.data.networking.mapper.standardEbookDetails
 import com.kliuchko.archive17.data.networking.mapper.toFreeBooks
 import com.kliuchko.archive17.data.networking.mapper.toDomain
+import com.kliuchko.archive17.data.networking.mapper.toPublicationEditions
 import com.kliuchko.archive17.domain.model.DownloadedBookMetadata
 import com.kliuchko.archive17.domain.model.FreeBook
 import com.kliuchko.archive17.domain.model.FreeBookDetails
@@ -264,6 +265,34 @@ class DefaultFreeBookRepository(
                 message = "Подробное описание пока не загрузилось.",
             )
         }
+    }
+
+    override suspend fun getRelatedEditions(
+        editionId: String,
+    ): RepositoryResult<List<PublicationEdition>> {
+        val book = booksByEditionId[editionId]
+            ?: return RepositoryResult.Error("Откройте книгу ещё раз из Каталога.")
+        val knownEditions = booksByEditionId.values
+            .asSequence()
+            .filter { candidate -> candidate.workId == book.workId }
+            .distinctBy(FreeBook::editionId)
+            .map(FreeBook::toPublicationEdition)
+            .toList()
+        val metadataEditions = try {
+            openLibraryApi.searchEditionMetadata(
+                query = book.title,
+                language = book.languageCode,
+                responseLanguage = book.languageCode.toIso6391(),
+            ).toPublicationEditions(book.languageCode)
+                .filter { edition -> edition.workId == book.workId }
+        } catch (exception: Throwable) {
+            if (exception is CancellationException) throw exception
+            emptyList()
+        }
+        val editions = (knownEditions + metadataEditions)
+            .distinctBy(PublicationEdition::id)
+            .sortedWith(publicationEditionPreference(book.languageCode))
+        return RepositoryResult.Success(editions)
     }
 
     override suspend fun keepDownloadableBooks(

@@ -147,7 +147,9 @@ fun FreeBookDetailsScreen(
                     value = localizedBookLanguage(book.languageCode),
                 )
 
-                val otherEditions = details.relatedEditions.filterNot { edition ->
+                val otherEditions = uiState.relatedEditions
+                    .ifEmpty { details.relatedEditions }
+                    .filterNot { edition ->
                     edition.id == book.editionId
                 }
                 if (otherEditions.isNotEmpty()) {
@@ -163,7 +165,14 @@ fun FreeBookDetailsScreen(
                     otherEditions.forEach { edition ->
                         RelatedEditionCard(
                             edition = edition,
-                            onClick = { onEditionClick(edition.id) },
+                            onClick = if (
+                                edition.accessOptions.firstOrNull()?.availability !=
+                                EditionAvailability.UNAVAILABLE
+                            ) {
+                                { onEditionClick(edition.id) }
+                            } else {
+                                null
+                            },
                         )
                     }
                 }
@@ -324,13 +333,13 @@ fun FreeBookDetailsScreen(
 @Composable
 private fun RelatedEditionCard(
     edition: PublicationEdition,
-    onClick: () -> Unit,
+    onClick: (() -> Unit)?,
 ) {
     val access = edition.accessOptions.firstOrNull()
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick),
+            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
     ) {
         Column(
@@ -376,8 +385,10 @@ private fun RelatedEditionCard(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            TextButton(onClick = onClick) {
-                Text(stringResource(R.string.choose_edition))
+            if (onClick != null) {
+                TextButton(onClick = onClick) {
+                    Text(stringResource(R.string.choose_edition))
+                }
             }
         }
     }
@@ -395,6 +406,7 @@ private fun editionAccessLabel(
     EditionAvailability.EXTERNAL_ONLY -> stringResource(R.string.edition_access_external)
     EditionAvailability.AVAILABLE -> when (mode) {
         EditionAccessMode.FREE -> stringResource(R.string.edition_access_free)
+        EditionAccessMode.REFERENCE -> stringResource(R.string.edition_access_unavailable)
         EditionAccessMode.SUBSCRIPTION -> stringResource(R.string.edition_access_subscription)
         EditionAccessMode.PURCHASE -> stringResource(R.string.edition_access_purchase)
         EditionAccessMode.PARTNER_PURCHASE -> stringResource(R.string.edition_access_partner)

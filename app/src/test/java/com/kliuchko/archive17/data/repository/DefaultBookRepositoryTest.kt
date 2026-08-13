@@ -275,6 +275,19 @@ private class FakeOpenLibraryApi : OpenLibraryApi {
         return searchResponse
     }
 
+    override suspend fun searchEditionMetadata(
+        query: String,
+        fields: String,
+        limit: Int,
+        page: Int,
+        language: String,
+        responseLanguage: String,
+    ): OpenLibrarySearchResponseDto {
+        searchCallCount += 1
+        searchError?.let { throw it }
+        return searchResponse
+    }
+
     override suspend fun getWork(workId: String): OpenLibraryWorkDto {
         workError?.let { throw it }
         return workResponse

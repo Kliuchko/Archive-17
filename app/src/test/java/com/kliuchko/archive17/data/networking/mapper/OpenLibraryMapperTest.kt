@@ -6,11 +6,51 @@ import com.kliuchko.archive17.data.networking.dto.OpenLibrarySearchResponseDto
 import com.kliuchko.archive17.data.networking.dto.OpenLibraryWorkDto
 import com.kliuchko.archive17.data.networking.dto.OpenLibraryEditionSearchDto
 import com.kliuchko.archive17.data.networking.dto.OpenLibraryEditionsDto
+import com.kliuchko.archive17.domain.model.EditionAvailability
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
 
 class OpenLibraryMapperTest {
+    @Test
+    fun `maps protected edition metadata without pretending it is readable`() {
+        val response = OpenLibrarySearchResponseDto(
+            docs = listOf(
+                OpenLibrarySearchDocDto(
+                    key = "/works/OL1W",
+                    title = "Work title",
+                    authorNames = listOf("Author"),
+                    coverId = 10,
+                    firstPublishYear = 1900,
+                    editionCount = 1,
+                    languages = listOf("rus"),
+                    editions = OpenLibraryEditionsDto(
+                        docs = listOf(
+                            OpenLibraryEditionSearchDto(
+                                key = "/books/OL2M",
+                                title = "Название издания",
+                                languages = listOf("rus"),
+                                publishDate = "2024",
+                                publishers = listOf("Издательство"),
+                            ),
+                        ),
+                    ),
+                ),
+            ),
+        )
+
+        val edition = response.toPublicationEditions("rus").single()
+
+        assertEquals("OL1W", edition.workId)
+        assertEquals("OL2M", edition.id)
+        assertEquals(2024, edition.publishedYear)
+        assertEquals("Издательство", edition.publisher)
+        assertEquals(
+            EditionAvailability.UNAVAILABLE,
+            edition.accessOptions.single().availability,
+        )
+    }
+
     @Test
     fun `maps only public editions with archive files to free books`() {
         val response = OpenLibrarySearchResponseDto(

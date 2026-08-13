@@ -7,6 +7,10 @@ import com.kliuchko.archive17.data.networking.dto.OpenLibrarySearchResponseDto
 import com.kliuchko.archive17.data.networking.dto.OpenLibraryWorkDto
 import com.kliuchko.archive17.domain.model.Work
 import com.kliuchko.archive17.domain.model.FreeBook
+import com.kliuchko.archive17.domain.model.EditionAccessMode
+import com.kliuchko.archive17.domain.model.EditionAccessOption
+import com.kliuchko.archive17.domain.model.EditionAvailability
+import com.kliuchko.archive17.domain.model.PublicationEdition
 import java.text.Normalizer
 
 fun OpenLibrarySearchResponseDto.toDomain(): List<Work> = docs.mapNotNull { it.toDomain() }
@@ -55,6 +59,48 @@ fun OpenLibrarySearchResponseDto.toFreeBooks(expectedLanguageCode: String? = nul
             archiveIdentifier = archiveIdentifier,
         )
     }
+
+fun OpenLibrarySearchResponseDto.toPublicationEditions(
+    expectedLanguageCode: String,
+): List<PublicationEdition> = docs.mapNotNull { document ->
+    val workId = document.key.toWorkId() ?: return@mapNotNull null
+    val edition = document.editions
+        ?.docs
+        .orEmpty()
+        .firstOrNull { candidate ->
+            !candidate.key.isNullOrBlank() &&
+                candidate.languages.orEmpty().contains(expectedLanguageCode)
+        }
+        ?: return@mapNotNull null
+    val editionId = edition.key
+        ?.removePrefix("/books/")
+        ?.takeIf(String::isNotBlank)
+        ?: return@mapNotNull null
+    val title = localizedTitle(
+        editionTitle = edition.title,
+        workTitle = document.title,
+        languageCode = expectedLanguageCode,
+    ) ?: return@mapNotNull null
+    PublicationEdition(
+        id = editionId,
+        workId = workId,
+        title = title,
+        authors = document.authorNames.normalizeList(),
+        languageCode = expectedLanguageCode,
+        translator = edition.contributors.extractTranslator(),
+        publishedYear = edition.publishDate.toEditionYear(),
+        publisher = edition.publishers.normalizeList().firstOrNull(),
+        coverId = document.preferredCoverId(edition),
+        accessOptions = listOf(
+            EditionAccessOption(
+                mode = EditionAccessMode.REFERENCE,
+                availability = EditionAvailability.UNAVAILABLE,
+                providerName = OPEN_LIBRARY_NAME,
+                actionUrl = "$OPEN_LIBRARY_BOOK_URL$editionId",
+            ),
+        ),
+    )
+}
 
 fun OpenLibrarySearchDocDto.toDomain(lastUpdatedAt: Long? = null): Work? {
     val workId = key.toWorkId() ?: return null
@@ -197,6 +243,8 @@ private fun JsonElement?.toDescription(): String? {
 }
 
 private const val PUBLIC_ACCESS = "public"
+private const val OPEN_LIBRARY_NAME = "Open Library"
+private const val OPEN_LIBRARY_BOOK_URL = "https://openlibrary.org/books/"
 private const val RUSSIAN_LANGUAGE = "rus"
 private val COMBINING_MARKS_PATTERN = Regex("\\p{M}+")
 private val EDITION_YEAR_PATTERN = Regex("\\b(?:1[0-9]{3}|20[0-2][0-9])\\b")
