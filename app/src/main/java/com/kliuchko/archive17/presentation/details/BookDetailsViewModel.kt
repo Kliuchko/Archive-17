@@ -209,16 +209,19 @@ class BookDetailsViewModel(
                 languageSettingsRepository.preferredBookLanguage.value.toCatalogCode()
             val deviceLanguageCode = deviceLanguageCode()
             _uiState.update { it.copy(isLoadingEditions = true) }
-            val resolvedOriginalLanguageCode = queryResolver.resolveOriginalLanguage(
+            val translationMetadata = queryResolver.resolveTranslationMetadata(
                 query = work.title,
                 preferredLanguageCode = preferredBookLanguageCode,
+                languageCodes = work.editionLanguages,
             )
+            val resolvedOriginalLanguageCode = translationMetadata.originalLanguageCode
             val (metadataResult, freeResult) = coroutineScope {
                 val metadata = async {
                     repository.getPublicationEditions(
                         work = work,
                         preferredLanguageCode = deviceLanguageCode,
                         originalLanguageCode = resolvedOriginalLanguageCode,
+                        localizedTitles = translationMetadata.titlesByLanguage,
                     )
                 }
                 val free = async {
@@ -240,9 +243,29 @@ class BookDetailsViewModel(
                     originalLanguageCode = originalLanguageCode,
                     freeBooksByEditionId = freeBooks.associateBy(FreeBook::editionId),
                     isLoadingEditions = false,
+                    isEnrichingEditions = true,
                     showAllEditionVariants = false,
                 )
             }
+            repository.loadPublicationEditionUpdates(
+                work = work,
+                languageCodes = editions
+                    .filter { edition -> edition.accessOptions.isEmpty() }
+                    .map(PublicationEdition::languageCode),
+                localizedTitles = translationMetadata.titlesByLanguage,
+            ).collect { updates ->
+                _uiState.update { current ->
+                    current.copy(
+                        editions = (current.editions + updates)
+                            .distinctBy(PublicationEdition::id)
+                            .groupMeaningfulVariants(
+                                preferredLanguageCode = deviceLanguageCode,
+                                originalLanguageCode = originalLanguageCode,
+                            ),
+                    )
+                }
+            }
+            _uiState.update { it.copy(isEnrichingEditions = false) }
         }
     }
 

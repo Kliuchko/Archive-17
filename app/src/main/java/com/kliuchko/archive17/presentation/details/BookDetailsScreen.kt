@@ -48,6 +48,7 @@ import org.koin.core.parameter.parametersOf
 fun BookDetailsScreen(
     workId: String,
     onBackClick: () -> Unit,
+    onAuthorClick: (String) -> Unit,
     onBookReady: (String) -> Unit,
     onTemporaryBookReady: (TemporaryBook) -> Unit,
     modifier: Modifier = Modifier,
@@ -148,6 +149,24 @@ fun BookDetailsScreen(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         textAlign = TextAlign.Center,
                     )
+                    work.authors.takeIf(List<String>::isNotEmpty)?.let { authors ->
+                        FlowRow(
+                            horizontalArrangement = Arrangement.Center,
+                            verticalArrangement = Arrangement.spacedBy(2.dp),
+                        ) {
+                            authors.forEach { author ->
+                                TextButton(onClick = { onAuthorClick(author) }) {
+                                    Text(
+                                        text = if (authors.size == 1) {
+                                            stringResource(R.string.books_by_this_author)
+                                        } else {
+                                            stringResource(R.string.books_by_author, author)
+                                        },
+                                    )
+                                }
+                            }
+                        }
+                    }
                     Text(
                         text = work.firstPublishYear?.toString() ?: stringResource(R.string.year_unknown),
                         style = MaterialTheme.typography.bodySmall,
@@ -226,6 +245,7 @@ fun BookDetailsScreen(
                                 WorkEditionCard(
                                     edition = edition,
                                     isOriginal = edition.languageCode == uiState.originalLanguageCode,
+                                    isEnriching = uiState.isEnrichingEditions,
                                     isFree = edition.id in uiState.freeBooksByEditionId,
                                     isBusy = uiState.readingEditionId != null ||
                                         uiState.downloadingEditionId != null,
@@ -313,6 +333,7 @@ fun BookDetailsScreen(
 private fun WorkEditionCard(
     edition: PublicationEdition,
     isOriginal: Boolean,
+    isEnriching: Boolean,
     isFree: Boolean,
     isBusy: Boolean,
     onRead: (() -> Unit)?,
@@ -340,7 +361,13 @@ private fun WorkEditionCard(
                 text = if (isFree) {
                     stringResource(R.string.edition_access_free)
                 } else if (access == null) {
-                    stringResource(R.string.edition_details_pending)
+                    stringResource(
+                        if (isEnriching) {
+                            R.string.edition_details_loading
+                        } else {
+                            R.string.edition_details_not_found
+                        },
+                    )
                 } else {
                     accessLabel(access?.mode, access?.availability)
                 },

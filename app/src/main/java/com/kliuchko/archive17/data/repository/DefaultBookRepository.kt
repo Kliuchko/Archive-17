@@ -25,9 +25,11 @@ import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
 import java.text.Normalizer
 import java.util.Locale
+import java.util.concurrent.ConcurrentHashMap
 
 class DefaultBookRepository(
     private val api: OpenLibraryApi,
@@ -38,6 +40,7 @@ class DefaultBookRepository(
     private val cacheFreshnessMillis: Long = DEFAULT_CACHE_FRESHNESS_MILLIS,
 ) : BookRepository {
     private val coverMatchEnricher = CoverMatchEnricher()
+    private val knownEditionCounts = ConcurrentHashMap<String, Int>()
 
     override suspend fun searchBooks(
         query: String,
@@ -165,6 +168,7 @@ class DefaultBookRepository(
         work: Work,
         preferredLanguageCode: String,
         originalLanguageCode: String?,
+        localizedTitles: Map<String, String>,
     ): RepositoryResult<List<PublicationEdition>> = runRepositoryCatching(
         errorMessage = "Не удалось загрузить издания книги.",
     ) {
@@ -173,24 +177,24 @@ class DefaultBookRepository(
             originalLanguageCode?.let(::add)
             add(preferredLanguageCode)
             addAll(PRIORITY_EDITION_LANGUAGES)
+            addAll(work.editionLanguages)
         }
             .filter { it.matches(EDITION_LANGUAGE_PATTERN) }
             .filter { language ->
                 availableLanguages.isEmpty() || language in availableLanguages
             }
             .distinct()
-            .take(MAX_PRIORITY_EDITION_LANGUAGES)
         val targetedLanguageCodes = listOfNotNull(
             originalLanguageCode,
             preferredLanguageCode,
         )
             .filter(languageCodes::contains)
             .distinct()
-        val (workEditions, searchResponses) = coroutineScope {
+        val (workEditionsResponse, searchResponses) = coroutineScope {
             val editions = async {
                 runCatching {
-                    api.getWorkEditions(work.id).toPublicationEditions(work)
-                }.getOrDefault(emptyList())
+                    api.getWorkEditions(work.id)
+                }.getOrNull()
             }
             targetedLanguageCodes.map { languageCode ->
                 async {
@@ -204,12 +208,15 @@ class DefaultBookRepository(
                 }
             }.awaitAll().filterNotNull().let { responses -> editions.await() to responses }
         }
+        workEditionsResponse?.size?.let { count -> knownEditionCounts[work.id] = count }
+        val workEditions = workEditionsResponse?.toPublicationEditions(work).orEmpty()
         val metadataEditions = searchResponses
             .flatMap { (languageCode, response) ->
                 response.toPublicationEditions(languageCode)
             }
             .filter { edition -> edition.workId == work.id }
-        val resolvedEditions = workEditions + metadataEditions
+        val resolvedEditions = (workEditions + metadataEditions)
+            .withLocalizedTitles(localizedTitles)
         val languagePlaceholders = languageCodes
             .filterNot { languageCode ->
                 resolvedEditions.any { edition -> edition.languageCode == languageCode }
@@ -218,7 +225,7 @@ class DefaultBookRepository(
                 PublicationEdition(
                     id = "language:${work.id}:$languageCode",
                     workId = work.id,
-                    title = work.title,
+                    title = localizedTitles[languageCode] ?: work.title,
                     authors = work.authors,
                     languageCode = languageCode,
                 )
@@ -231,6 +238,48 @@ class DefaultBookRepository(
                 }.thenByDescending { it.publishedYear ?: Int.MIN_VALUE },
             )
         RepositoryResult.Success(editions)
+    }
+
+    override fun loadPublicationEditionUpdates(
+        work: Work,
+        languageCodes: List<String>,
+        localizedTitles: Map<String, String>,
+    ): Flow<List<PublicationEdition>> = flow {
+        val editionCount = knownEditionCounts[work.id].orEmptyCount()
+        val lastOffset = minOf(editionCount, MAX_WORK_EDITION_RECORDS)
+        for (offset in OpenLibraryApi.WORK_EDITIONS_LIMIT until lastOffset step OpenLibraryApi.WORK_EDITIONS_LIMIT) {
+            val page = runCatching {
+                api.getWorkEditions(
+                    workId = work.id,
+                    limit = OpenLibraryApi.WORK_EDITIONS_LIMIT,
+                    offset = offset,
+                ).toPublicationEditions(work)
+            }.getOrDefault(emptyList())
+                .withLocalizedTitles(localizedTitles)
+            if (page.isNotEmpty()) emit(page)
+        }
+
+        languageCodes
+            .filter { code -> code.matches(EDITION_LANGUAGE_PATTERN) }
+            .distinct()
+            .chunked(EDITION_LANGUAGE_REQUEST_CONCURRENCY)
+            .forEach { batch ->
+                val editions = coroutineScope {
+                    batch.map { languageCode ->
+                        async {
+                            runCatching {
+                                api.searchEditionMetadata(
+                                    query = work.title,
+                                    language = languageCode,
+                                    responseLanguage = languageCode.toIso6391(),
+                                ).toPublicationEditions(languageCode)
+                                    .filter { edition -> edition.workId == work.id }
+                            }.getOrDefault(emptyList())
+                        }
+                    }.awaitAll().flatten()
+                }.withLocalizedTitles(localizedTitles)
+                if (editions.isNotEmpty()) emit(editions)
+            }
     }
 
     override fun observeLibrary(status: ReadingStatus?): Flow<List<LibraryBook>> =
@@ -294,7 +343,8 @@ class DefaultBookRepository(
         const val DEFAULT_CACHE_FRESHNESS_MILLIS = 24L * 60L * 60L * 1000L
         private const val CACHED_SEARCH_SCAN_LIMIT = 200
         private const val CACHED_SEARCH_RESULT_LIMIT = 50
-        private const val MAX_PRIORITY_EDITION_LANGUAGES = 14
+        private const val MAX_WORK_EDITION_RECORDS = 500
+        private const val EDITION_LANGUAGE_REQUEST_CONCURRENCY = 2
         private val PRIORITY_EDITION_LANGUAGES = listOf(
             "eng", "rus", "ukr", "spa", "fre", "ger", "ita", "pol",
             "por", "chi", "jpn", "ara", "kor", "tur", "dut", "swe",
@@ -305,6 +355,17 @@ class DefaultBookRepository(
                 .thenBy(String.CASE_INSENSITIVE_ORDER) { it.title }
     }
 }
+
+private fun List<PublicationEdition>.withLocalizedTitles(
+    titlesByLanguage: Map<String, String>,
+): List<PublicationEdition> = map { edition ->
+    titlesByLanguage[edition.languageCode]
+        ?.takeIf(String::isNotBlank)
+        ?.let { title -> edition.copy(title = title) }
+        ?: edition
+}
+
+private fun Int?.orEmptyCount(): Int = this ?: 0
 
 private fun String.toCatalogSearchKey(): String = Normalizer
     .normalize(this, Normalizer.Form.NFKD)

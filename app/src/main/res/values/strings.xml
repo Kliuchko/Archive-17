@@ -31,6 +31,8 @@
     <string name="stopped_here">ВЫ ОСТАНОВИЛИСЬ ЗДЕСЬ</string>
     <string name="continue_book">Вернуться к книге →</string>
     <string name="author_unknown">Автор не указан</string>
+    <string name="books_by_this_author">Книги этого автора</string>
+    <string name="books_by_author">Книги автора: %1$s</string>
     <string name="archive_halls">Залы Архива</string>
     <string name="all_directions">Все направления</string>
     <string name="free_books">Бесплатные книги</string>
@@ -91,6 +93,8 @@
     <string name="catalog_welcome_body">Сейчас Archive 17 ищет книги по названию и автору. Полные бесплатные тексты и фильтр доступа появятся на следующем этапе.</string>
     <string name="free_books_soon">БЕСПЛАТНЫЕ КНИГИ · СКОРО</string>
     <string name="edition_details_pending">Сведения об издании уточняются</string>
+    <string name="edition_details_loading">Ищем конкретные издания…</string>
+    <string name="edition_details_not_found">Конкретные издания пока не найдены</string>
     <string name="shelf_empty">На Полке пока пусто</string>
     <string name="shelf_section_empty">В этом разделе пока пусто</string>
     <string name="shelf_empty_body">Найдите книгу в каталоге или добавьте свой EPUB с устройства.</string>

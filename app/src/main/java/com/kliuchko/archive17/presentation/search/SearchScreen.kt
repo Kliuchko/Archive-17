@@ -30,6 +30,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -58,10 +59,19 @@ fun SearchScreen(
     onFreeBookClick: (String) -> Unit,
     onFreeBookReady: (String) -> Unit,
     onTemporaryBookReady: (TemporaryBook) -> Unit,
+    externalQuery: String? = null,
+    onExternalQueryHandled: () -> Unit = {},
     modifier: Modifier = Modifier,
     viewModel: SearchViewModel = koinViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+
+    LaunchedEffect(externalQuery) {
+        externalQuery?.takeIf(String::isNotBlank)?.let { requestedQuery ->
+            viewModel.searchByAuthor(requestedQuery)
+            onExternalQueryHandled()
+        }
+    }
 
     LaunchedEffect(uiState.downloadedBookId) {
         uiState.downloadedBookId?.let { bookId ->
@@ -252,12 +262,9 @@ private fun SearchResults(
             uiState.alternativeEditionBooks.isNotEmpty() ||
             uiState.otherLanguageBooks.isNotEmpty() ||
             uiState.otherFreeBooks.isNotEmpty() -> {
-            val listState = rememberLazyListState()
-            ResetCatalogScrollEffect(
-                listState = listState,
-                query = uiState.query,
-                mode = uiState.selectedMode,
-            )
+            val listState = key(uiState.catalogListVersion, uiState.selectedMode) {
+                rememberLazyListState()
+            }
             LoadNextPageEffect(
                 listState = listState,
                 enabled = uiState.canLoadMore && !uiState.isLoadingNextPage,
@@ -343,12 +350,9 @@ private fun SearchResults(
         }
 
         uiState.books.isNotEmpty() -> {
-            val listState = rememberLazyListState()
-            ResetCatalogScrollEffect(
-                listState = listState,
-                query = uiState.query,
-                mode = uiState.selectedMode,
-            )
+            val listState = key(uiState.catalogListVersion, uiState.selectedMode) {
+                rememberLazyListState()
+            }
             LoadNextPageEffect(
                 listState = listState,
                 enabled = uiState.canLoadMore && !uiState.isLoadingNextPage,
@@ -432,17 +436,6 @@ private fun LoadNextPageEffect(
             .collect { shouldLoad ->
                 if (shouldLoad) onLoadNextPage()
             }
-    }
-}
-
-@Composable
-private fun ResetCatalogScrollEffect(
-    listState: LazyListState,
-    query: String,
-    mode: CatalogMode,
-) {
-    LaunchedEffect(query.trim(), mode) {
-        listState.scrollToItem(0)
     }
 }
 

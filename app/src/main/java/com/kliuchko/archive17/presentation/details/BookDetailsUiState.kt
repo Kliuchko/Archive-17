@@ -18,6 +18,7 @@ data class BookDetailsUiState(
     val originalLanguageCode: String? = null,
     val freeBooksByEditionId: Map<String, FreeBook> = emptyMap(),
     val isLoadingEditions: Boolean = false,
+    val isEnrichingEditions: Boolean = false,
     val showAllEditionVariants: Boolean = false,
     val downloadingEditionId: String? = null,
     val readingEditionId: String? = null,

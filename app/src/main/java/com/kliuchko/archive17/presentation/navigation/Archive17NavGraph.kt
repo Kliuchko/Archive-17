@@ -9,6 +9,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -99,7 +100,10 @@ fun Archive17App(
                 )
             }
 
-            composable(Archive17Destination.Search.route) {
+            composable(Archive17Destination.Search.route) { searchEntry ->
+                val externalQuery by searchEntry.savedStateHandle
+                    .getStateFlow<String?>(CATALOG_QUERY_REQUEST_KEY, null)
+                    .collectAsStateWithLifecycle()
                 SearchScreen(
                     onBookClick = { workId ->
                         navController.navigate(Archive17Destination.Details.createRoute(workId))
@@ -112,6 +116,10 @@ fun Archive17App(
                     },
                     onTemporaryBookReady = { book ->
                         context.startActivity(EpubReaderActivity.createTemporaryIntent(context, book))
+                    },
+                    externalQuery = externalQuery,
+                    onExternalQueryHandled = {
+                        searchEntry.savedStateHandle[CATALOG_QUERY_REQUEST_KEY] = null
                     },
                 )
             }
@@ -159,6 +167,7 @@ fun Archive17App(
                 BookDetailsScreen(
                     workId = workId,
                     onBackClick = navController::popBackStack,
+                    onAuthorClick = navController::openCatalogSearch,
                     onBookReady = { bookId ->
                         navController.navigate(Archive17Destination.LocalDetails.createRoute(bookId))
                     },
@@ -213,6 +222,26 @@ fun Archive17App(
         }
     }
 }
+
+private fun NavHostController.openCatalogSearch(query: String) {
+    val catalogEntry = runCatching {
+        getBackStackEntry(Archive17Destination.Search.route)
+    }.getOrNull()
+    if (catalogEntry != null) {
+        catalogEntry.savedStateHandle[CATALOG_QUERY_REQUEST_KEY] = query
+        popBackStack(Archive17Destination.Search.route, inclusive = false)
+        return
+    }
+    navigate(Archive17Destination.Search.route) {
+        launchSingleTop = true
+    }
+    runCatching { getBackStackEntry(Archive17Destination.Search.route) }
+        .getOrNull()
+        ?.savedStateHandle
+        ?.set(CATALOG_QUERY_REQUEST_KEY, query)
+}
+
+private const val CATALOG_QUERY_REQUEST_KEY = "catalog_query_request"
 
 @Composable
 private fun ArchiveBottomNavigation(

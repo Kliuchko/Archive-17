@@ -31,6 +31,8 @@
     <string name="stopped_here">YOU STOPPED HERE</string>
     <string name="continue_book">Return to the book →</string>
     <string name="author_unknown">Author not specified</string>
+    <string name="books_by_this_author">Books by this author</string>
+    <string name="books_by_author">Books by %1$s</string>
     <string name="archive_halls">Archive Halls</string>
     <string name="all_directions">All sections</string>
     <string name="free_books">Free books</string>
@@ -91,6 +93,8 @@
     <string name="catalog_welcome_body">Archive 17 currently searches for books by title and author. Full free texts and access filters will appear in the next stage.</string>
     <string name="free_books_soon">FREE BOOKS · SOON</string>
     <string name="edition_details_pending">Edition details are being clarified</string>
+    <string name="edition_details_loading">Looking for specific editions…</string>
+    <string name="edition_details_not_found">No specific editions found yet</string>
     <string name="shelf_empty">The Shelf is empty</string>
     <string name="shelf_section_empty">This section is empty</string>
     <string name="shelf_empty_body">Find a book in the catalog or add your own EPUB from the device.</string>

@@ -33,6 +33,7 @@ data class SearchUiState(
     val actionMessage: String? = null,
     val isFreeCatalogFallback: Boolean = false,
     val hasSearched: Boolean = false,
+    val catalogListVersion: Long = 0L,
 ) {
     val showMinimumQueryState: Boolean
         get() = query.isNotBlank() && query.trim().length < MIN_QUERY_LENGTH

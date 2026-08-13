@@ -132,6 +132,15 @@ class SearchViewModel(
         }
     }
 
+    fun searchByAuthor(author: String) {
+        val normalizedAuthor = author.trim()
+        if (normalizedAuthor.length < SearchUiState.MIN_QUERY_LENGTH) return
+        if (selectedMode.value != CatalogMode.ALL) {
+            onModeSelected(CatalogMode.ALL)
+        }
+        onQueryChange(normalizedAuthor)
+    }
+
     fun downloadBook(book: FreeBook) {
         if (
             _uiState.value.downloadingBookId != null ||
@@ -288,6 +297,7 @@ class SearchViewModel(
                 isFreeCatalogFallback = false,
                 selectedMode = request.mode,
                 bookLanguageCode = request.languageCode,
+                catalogListVersion = it.catalogListVersion + 1,
             )
         }
 
@@ -349,7 +359,7 @@ class SearchViewModel(
                 isCheckingFreeBooks = false,
                 isLoadingNextPage = false,
                 canLoadMore = false,
-                books = books,
+                books = books.sortedForQuery(it.query),
                 freeBooks = emptyList(),
                 alternativeEditionBooks = emptyList(),
                 otherLanguageBooks = emptyList(),
@@ -359,6 +369,7 @@ class SearchViewModel(
                 actionMessage = null,
                 isFreeCatalogFallback = true,
                 hasSearched = true,
+                catalogListVersion = it.catalogListVersion + 1,
             )
         }
     }
@@ -430,6 +441,11 @@ class SearchViewModel(
                     otherLanguageBooks = classified.otherLanguages,
                     otherFreeBooks = classified.other,
                     editionCountsByWorkId = classified.editionCounts,
+                    catalogListVersion = if (it.query.isNotBlank()) {
+                        it.catalogListVersion + 1
+                    } else {
+                        it.catalogListVersion
+                    },
                 )
             }
             is RepositoryResult.Cached -> _uiState.update {
@@ -443,6 +459,11 @@ class SearchViewModel(
                     otherFreeBooks = classified.other,
                     editionCountsByWorkId = classified.editionCounts,
                     actionMessage = availability.message,
+                    catalogListVersion = if (it.query.isNotBlank()) {
+                        it.catalogListVersion + 1
+                    } else {
+                        it.catalogListVersion
+                    },
                 )
             }
             is RepositoryResult.Error -> _uiState.update {
@@ -457,6 +478,11 @@ class SearchViewModel(
                     },
                     editionCountsByWorkId = candidates.editionCounts(),
                     actionMessage = availability.message,
+                    catalogListVersion = if (it.query.isNotBlank()) {
+                        it.catalogListVersion + 1
+                    } else {
+                        it.catalogListVersion
+                    },
                 )
             }
         }
@@ -534,7 +560,10 @@ class SearchViewModel(
         }
         when (result) {
             is RepositoryResult.Success -> {
-                showAllBooks((cachedBooks + result.data).distinctBy(Work::id))
+                showAllBooks(
+                    books = (cachedBooks + result.data).distinctBy(Work::id),
+                    resetList = request.query.isNotBlank(),
+                )
                 activatePagination(
                     request = request.copy(query = effectiveQuery),
                     canLoadMore = result.data.isNotEmpty(),
@@ -545,6 +574,7 @@ class SearchViewModel(
                 showAllBooks(
                     books = (cachedBooks + result.data).distinctBy(Work::id),
                     notice = result.message,
+                    resetList = request.query.isNotBlank(),
                 )
                 activatePagination(
                     request = request.copy(query = effectiveQuery),
@@ -562,13 +592,14 @@ class SearchViewModel(
         books: List<Work>,
         notice: String? = null,
         isRefreshing: Boolean = false,
+        resetList: Boolean = false,
     ) {
         _uiState.update {
             it.copy(
                 isLoading = isRefreshing,
                 isCheckingFreeBooks = false,
                 isLoadingNextPage = false,
-                books = books.sortedByPopularity(),
+                books = books.sortedForQuery(it.query),
                 freeBooks = emptyList(),
                 alternativeEditionBooks = emptyList(),
                 otherLanguageBooks = emptyList(),
@@ -578,6 +609,11 @@ class SearchViewModel(
                 actionMessage = notice,
                 isFreeCatalogFallback = false,
                 hasSearched = true,
+                catalogListVersion = if (resetList) {
+                    it.catalogListVersion + 1
+                } else {
+                    it.catalogListVersion
+                },
             )
         }
     }
@@ -655,7 +691,7 @@ class SearchViewModel(
             state.copy(
                 books = (state.books + books)
                     .distinctBy(Work::id)
-                    .sortedByPopularity(),
+                    .sortedForQuery(state.query),
                 isLoadingNextPage = false,
                 canLoadMore = books.isNotEmpty(),
                 nextPageError = null,
@@ -804,4 +840,39 @@ class SearchViewModel(
         compareByDescending<Work> { work -> work.editionCount ?: 0 }
             .thenBy(String.CASE_INSENSITIVE_ORDER) { work -> work.title },
     )
+
+    private fun List<Work>.sortedForQuery(query: String): List<Work> {
+        val queryKey = query.toSearchKey()
+        if (queryKey.isBlank()) return sortedByPopularity()
+        return sortedWith(
+            compareByDescending<Work> { work -> work.searchMatchScore(queryKey) }
+                .thenByDescending { work -> work.editionCount ?: 0 }
+                .thenBy(String.CASE_INSENSITIVE_ORDER) { work -> work.title },
+        )
+    }
+
+    private fun Work.searchMatchScore(queryKey: String): Int {
+        val titleKey = title.toSearchKey()
+        val authorKeys = authors.map { author -> author.toSearchKey() }
+        return maxOf(
+            when {
+                titleKey == queryKey -> 120
+                titleKey.startsWith(queryKey) -> 110
+                titleKey.contains(queryKey) -> 100
+                else -> 0
+            },
+            authorKeys.maxOfOrNull { authorKey ->
+                when {
+                    authorKey == queryKey -> 115
+                    authorKey.startsWith(queryKey) -> 105
+                    authorKey.contains(queryKey) -> 95
+                    else -> 0
+                }
+            } ?: 0,
+        )
+    }
+
+    private fun String.toSearchKey(): String = lowercase(Locale.ROOT)
+        .replace('ё', 'е')
+        .filter(Char::isLetterOrDigit)
 }

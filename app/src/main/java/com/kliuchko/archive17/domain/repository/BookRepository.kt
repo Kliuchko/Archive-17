@@ -26,7 +26,14 @@ interface BookRepository {
         work: Work,
         preferredLanguageCode: String,
         originalLanguageCode: String? = null,
+        localizedTitles: Map<String, String> = emptyMap(),
     ): RepositoryResult<List<PublicationEdition>>
+
+    fun loadPublicationEditionUpdates(
+        work: Work,
+        languageCodes: List<String>,
+        localizedTitles: Map<String, String> = emptyMap(),
+    ): Flow<List<PublicationEdition>>
 
     fun observeLibrary(status: ReadingStatus? = null): Flow<List<LibraryBook>>
 

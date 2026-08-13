@@ -6,6 +6,7 @@ import com.kliuchko.archive17.data.networking.api.WikidataApi
 import com.kliuchko.archive17.data.networking.dto.WikidataEntityDto
 import com.kliuchko.archive17.data.networking.dto.WikidataSearchItemDto
 import com.kliuchko.archive17.domain.repository.BookQueryResolver
+import com.kliuchko.archive17.domain.repository.BookTranslationMetadata
 import java.text.Normalizer
 import java.util.Locale
 import kotlinx.coroutines.CancellationException
@@ -62,33 +63,56 @@ class WikidataBookQueryResolver(
     override suspend fun resolveOriginalLanguage(
         query: String,
         preferredLanguageCode: String?,
-    ): String? {
+    ): String? = resolveTranslationMetadata(
+        query = query,
+        preferredLanguageCode = preferredLanguageCode,
+    ).originalLanguageCode
+
+    override suspend fun resolveTranslationMetadata(
+        query: String,
+        preferredLanguageCode: String?,
+        languageCodes: List<String>,
+    ): BookTranslationMetadata {
         val original = query.trim()
-        if (original.length < MIN_QUERY_LENGTH) return null
+        if (original.length < MIN_QUERY_LENGTH) return BookTranslationMetadata()
         val language = original.detectSearchLanguage(preferredLanguageCode)
-        val key = cacheKey(original, language)
-        readOriginalLanguageCache(key)?.let { return it }
+        val requestedCatalogLanguages = buildList {
+            preferredLanguageCode?.let(::add)
+            addAll(languageCodes)
+        }
+            .filter { code -> code.matches(CATALOG_LANGUAGE_PATTERN) }
+            .distinct()
+        val key = cacheKey(
+            query = original,
+            language = "$language|${requestedCatalogLanguages.sorted().joinToString(",")}",
+        )
+        readTranslationMetadataCache(key)?.let { return it }
         return mutex.withLock {
-            readOriginalLanguageCache(key)?.let { return@withLock it }
+            readTranslationMetadataCache(key)?.let { return@withLock it }
             val resolved = try {
                 val search = api.searchEntities(original, language)
                 val candidateIds = selectWikidataCandidateIds(original, search.search)
                 if (candidateIds.isEmpty()) {
-                    null
+                    BookTranslationMetadata()
                 } else {
                     val entities = api.getEntities(
                         ids = candidateIds.joinToString("|"),
-                        languages = requestedLanguages(language, preferredLanguageCode),
+                        languages = requestedLanguages(
+                            inputLanguage = language,
+                            preferredLanguageCode = preferredLanguageCode,
+                            additionalLanguageCodes = requestedCatalogLanguages,
+                        ),
                     )
-                    candidateIds.firstNotNullOfOrNull { id ->
-                        entities.entities[id]?.originalLanguageCode()
-                    }
+                    buildTranslationMetadata(
+                        candidates = candidateIds.mapNotNull(entities.entities::get),
+                        requestedCatalogLanguages = requestedCatalogLanguages,
+                    )
                 }
             } catch (exception: Throwable) {
                 if (exception is CancellationException) throw exception
-                null
+                BookTranslationMetadata()
             }
-            writeOriginalLanguageCache(key, resolved)
+            writeTranslationMetadataCache(key, resolved)
             resolved
         }
     }
@@ -113,20 +137,37 @@ class WikidataBookQueryResolver(
         preferences.edit().putString(key, json.toString()).apply()
     }
 
-    private fun readOriginalLanguageCache(key: String): String? = runCatching {
-        val raw = preferences.getString("original-$key", null) ?: return null
+    private fun readTranslationMetadataCache(key: String): BookTranslationMetadata? = runCatching {
+        val raw = preferences.getString("translation-$key", null) ?: return null
         val json = JSONObject(raw)
         val savedAt = json.optLong(CACHE_TIMESTAMP, 0L)
         if (System.currentTimeMillis() - savedAt > CACHE_TTL_MILLIS) return null
-        json.optString(CACHE_ORIGINAL_LANGUAGE).takeIf(String::isNotBlank)
+        val titlesJson = json.optJSONObject(CACHE_LOCALIZED_TITLES) ?: JSONObject()
+        val titles = buildMap {
+            titlesJson.keys().forEach { languageCode ->
+                titlesJson.optString(languageCode)
+                    .takeIf(String::isNotBlank)
+                    ?.let { title -> put(languageCode, title) }
+            }
+        }
+        BookTranslationMetadata(
+            originalLanguageCode = json.optString(CACHE_ORIGINAL_LANGUAGE)
+                .takeIf(String::isNotBlank),
+            titlesByLanguage = titles,
+        )
     }.getOrNull()
 
-    private fun writeOriginalLanguageCache(key: String, languageCode: String?) {
-        if (languageCode == null) return
+    private fun writeTranslationMetadataCache(key: String, metadata: BookTranslationMetadata) {
+        val titles = JSONObject().apply {
+            metadata.titlesByLanguage.forEach { (languageCode, title) ->
+                put(languageCode, title)
+            }
+        }
         val json = JSONObject()
             .put(CACHE_TIMESTAMP, System.currentTimeMillis())
-            .put(CACHE_ORIGINAL_LANGUAGE, languageCode)
-        preferences.edit().putString("original-$key", json.toString()).apply()
+            .put(CACHE_ORIGINAL_LANGUAGE, metadata.originalLanguageCode.orEmpty())
+            .put(CACHE_LOCALIZED_TITLES, titles)
+        preferences.edit().putString("translation-$key", json.toString()).apply()
     }
 
     private fun cacheKey(query: String, language: String): String {
@@ -143,7 +184,9 @@ class WikidataBookQueryResolver(
         const val CACHE_TIMESTAMP = "saved_at"
         const val CACHE_QUERIES = "queries"
         const val CACHE_ORIGINAL_LANGUAGE = "original_language"
+        const val CACHE_LOCALIZED_TITLES = "localized_titles"
         const val CACHE_TTL_MILLIS = 30L * 24L * 60L * 60L * 1000L
+        val CATALOG_LANGUAGE_PATTERN = Regex("[a-z]{3}")
     }
 }
 
@@ -158,6 +201,23 @@ private fun WikidataEntityDto.originalLanguageCode(): String? = claims["P364"]
             ?.asString
             ?.let(ORIGINAL_LANGUAGE_CODES::get)
     }
+
+internal fun buildTranslationMetadata(
+    candidates: List<WikidataEntityDto>,
+    requestedCatalogLanguages: List<String>,
+): BookTranslationMetadata = BookTranslationMetadata(
+    originalLanguageCode = candidates.firstNotNullOfOrNull(
+        WikidataEntityDto::originalLanguageCode,
+    ),
+    titlesByLanguage = buildMap {
+        requestedCatalogLanguages.forEach { catalogCode ->
+            val isoCode = catalogCode.toIso6391()
+            candidates.firstNotNullOfOrNull { entity ->
+                entity.labels[isoCode]?.value?.takeIf(String::isNotBlank)
+            }?.let { title -> put(catalogCode, title) }
+        }
+    },
+)
 
 internal fun selectWikidataCandidateIds(
     query: String,
@@ -226,10 +286,15 @@ internal fun buildResolvedBookQueries(
     }
 }.distinctBy(String::toQueryKey).take(MAX_RESOLVED_QUERIES)
 
-private fun requestedLanguages(inputLanguage: String, preferredLanguageCode: String?): String =
+private fun requestedLanguages(
+    inputLanguage: String,
+    preferredLanguageCode: String?,
+    additionalLanguageCodes: List<String> = emptyList(),
+): String =
     buildList {
         add(inputLanguage)
         preferredLanguageCode?.toIso6391()?.let(::add)
+        additionalLanguageCodes.mapTo(this) { code -> code.toIso6391() }
         addAll(PREFERRED_LABEL_LANGUAGES)
     }.distinct().joinToString("|")
 
@@ -250,6 +315,20 @@ private fun String.toIso6391(): String = when (lowercase(Locale.ROOT)) {
     "deu", "ger" -> "de"
     "fra", "fre" -> "fr"
     "spa" -> "es"
+    "pol" -> "pl"
+    "por" -> "pt"
+    "zho", "chi" -> "zh"
+    "jpn" -> "ja"
+    "ara" -> "ar"
+    "kor" -> "ko"
+    "tur" -> "tr"
+    "nld", "dut" -> "nl"
+    "swe" -> "sv"
+    "fin" -> "fi"
+    "ces", "cze" -> "cs"
+    "heb" -> "he"
+    "hin" -> "hi"
+    "ben" -> "bn"
     else -> take(2)
 }
 

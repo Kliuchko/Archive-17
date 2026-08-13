@@ -4,6 +4,10 @@ import com.kliuchko.archive17.data.networking.dto.WikidataEntityDto
 import com.kliuchko.archive17.data.networking.dto.WikidataMatchDto
 import com.kliuchko.archive17.data.networking.dto.WikidataSearchItemDto
 import com.kliuchko.archive17.data.networking.dto.WikidataTermDto
+import com.google.gson.JsonParser
+import com.kliuchko.archive17.data.networking.dto.WikidataClaimDto
+import com.kliuchko.archive17.data.networking.dto.WikidataDataValueDto
+import com.kliuchko.archive17.data.networking.dto.WikidataSnakDto
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -117,6 +121,35 @@ class WikidataBookQueryResolverTest {
             listOf("Oliver Twist", "Приключения Оливера Твиста", "Оливер Твист"),
             queries.take(3),
         )
+    }
+
+    @Test
+    fun `translation metadata uses localized work titles for every requested language`() {
+        val metadata = buildTranslationMetadata(
+            candidates = listOf(
+                WikidataEntityDto(
+                    labels = mapOf(
+                        "en" to term("en", "Fahrenheit 451"),
+                        "ru" to term("ru", "451 градус по Фаренгейту"),
+                        "uk" to term("uk", "451 градус за Фаренгейтом"),
+                    ),
+                    claims = mapOf(
+                        "P364" to listOf(
+                            WikidataClaimDto(
+                                WikidataSnakDto(
+                                    WikidataDataValueDto(JsonParser.parseString("""{"id":"Q1860"}""")),
+                                ),
+                            ),
+                        ),
+                    ),
+                ),
+            ),
+            requestedCatalogLanguages = listOf("eng", "rus", "ukr"),
+        )
+
+        assertEquals("eng", metadata.originalLanguageCode)
+        assertEquals("451 градус по Фаренгейту", metadata.titlesByLanguage["rus"])
+        assertEquals("451 градус за Фаренгейтом", metadata.titlesByLanguage["ukr"])
     }
 
     private fun searchItem(id: String, label: String, description: String) =

@@ -54,7 +54,7 @@ interface OpenLibraryApi {
         const val SEARCH_LIMIT = 20
         const val FREE_SEARCH_LIMIT = 12
         const val EDITION_METADATA_LIMIT = 5
-        const val WORK_EDITIONS_LIMIT = 30
+        const val WORK_EDITIONS_LIMIT = 100
         const val SEARCH_FIELDS = "key,title,author_name,cover_i,first_publish_year,edition_count,language"
         const val FREE_SEARCH_FIELDS =
             "key,title,author_name,cover_i,first_publish_year,edition_count,language,ebook_access," +
