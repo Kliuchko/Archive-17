@@ -59,6 +59,40 @@ class WikidataBookQueryResolver(
         }
     }
 
+    override suspend fun resolveOriginalLanguage(
+        query: String,
+        preferredLanguageCode: String?,
+    ): String? {
+        val original = query.trim()
+        if (original.length < MIN_QUERY_LENGTH) return null
+        val language = original.detectSearchLanguage(preferredLanguageCode)
+        val key = cacheKey(original, language)
+        readOriginalLanguageCache(key)?.let { return it }
+        return mutex.withLock {
+            readOriginalLanguageCache(key)?.let { return@withLock it }
+            val resolved = try {
+                val search = api.searchEntities(original, language)
+                val candidateIds = selectWikidataCandidateIds(original, search.search)
+                if (candidateIds.isEmpty()) {
+                    null
+                } else {
+                    val entities = api.getEntities(
+                        ids = candidateIds.joinToString("|"),
+                        languages = requestedLanguages(language, preferredLanguageCode),
+                    )
+                    candidateIds.firstNotNullOfOrNull { id ->
+                        entities.entities[id]?.originalLanguageCode()
+                    }
+                }
+            } catch (exception: Throwable) {
+                if (exception is CancellationException) throw exception
+                null
+            }
+            writeOriginalLanguageCache(key, resolved)
+            resolved
+        }
+    }
+
     private fun readCache(key: String): List<String>? = runCatching {
         val raw = preferences.getString(key, null) ?: return null
         val json = JSONObject(raw)
@@ -79,6 +113,22 @@ class WikidataBookQueryResolver(
         preferences.edit().putString(key, json.toString()).apply()
     }
 
+    private fun readOriginalLanguageCache(key: String): String? = runCatching {
+        val raw = preferences.getString("original-$key", null) ?: return null
+        val json = JSONObject(raw)
+        val savedAt = json.optLong(CACHE_TIMESTAMP, 0L)
+        if (System.currentTimeMillis() - savedAt > CACHE_TTL_MILLIS) return null
+        json.optString(CACHE_ORIGINAL_LANGUAGE).takeIf(String::isNotBlank)
+    }.getOrNull()
+
+    private fun writeOriginalLanguageCache(key: String, languageCode: String?) {
+        if (languageCode == null) return
+        val json = JSONObject()
+            .put(CACHE_TIMESTAMP, System.currentTimeMillis())
+            .put(CACHE_ORIGINAL_LANGUAGE, languageCode)
+        preferences.edit().putString("original-$key", json.toString()).apply()
+    }
+
     private fun cacheKey(query: String, language: String): String {
         val value = "$language|${query.toQueryKey()}"
         return Base64.encodeToString(
@@ -92,9 +142,22 @@ class WikidataBookQueryResolver(
         const val QUERY_CACHE_PREFERENCES = "book_query_resolver_cache"
         const val CACHE_TIMESTAMP = "saved_at"
         const val CACHE_QUERIES = "queries"
+        const val CACHE_ORIGINAL_LANGUAGE = "original_language"
         const val CACHE_TTL_MILLIS = 30L * 24L * 60L * 60L * 1000L
     }
 }
+
+private fun WikidataEntityDto.originalLanguageCode(): String? = claims["P364"]
+    .orEmpty()
+    .firstNotNullOfOrNull { claim ->
+        claim.mainsnak?.datavalue?.value
+            ?.takeIf { value -> value.isJsonObject }
+            ?.asJsonObject
+            ?.get("id")
+            ?.takeIf { id -> id.isJsonPrimitive }
+            ?.asString
+            ?.let(ORIGINAL_LANGUAGE_CODES::get)
+    }
 
 internal fun selectWikidataCandidateIds(
     query: String,
@@ -213,5 +276,25 @@ private val BOOK_DESCRIPTION_MARKERS = listOf(
 )
 private val NON_BOOK_DESCRIPTION_MARKERS = listOf(
     "film", "television", "video game", "fictional character", "фильм", "телесериал", "персонаж",
+)
+private val ORIGINAL_LANGUAGE_CODES = mapOf(
+    "Q1860" to "eng",
+    "Q7737" to "rus",
+    "Q8798" to "ukr",
+    "Q150" to "fre",
+    "Q188" to "ger",
+    "Q652" to "ita",
+    "Q1321" to "spa",
+    "Q809" to "pol",
+    "Q5287" to "jpn",
+    "Q7850" to "chi",
+    "Q13955" to "ara",
+    "Q5146" to "por",
+    "Q9176" to "kor",
+    "Q256" to "tur",
+    "Q7411" to "dut",
+    "Q9027" to "swe",
+    "Q1412" to "fin",
+    "Q9056" to "ces",
 )
 private const val UKRAINIAN_LETTERS = "іїєґІЇЄҐ"

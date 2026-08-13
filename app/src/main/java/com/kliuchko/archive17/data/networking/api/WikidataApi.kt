@@ -23,7 +23,7 @@ interface WikidataApi {
         @Query("ids") ids: String,
         @Query("languages") languages: String,
         @Query("action") action: String = "wbgetentities",
-        @Query("props") properties: String = "labels|aliases|descriptions",
+        @Query("props") properties: String = "labels|aliases|descriptions|claims",
         @Query("languagefallback") languageFallback: Int = 1,
         @Query("format") format: String = "json",
         @Query("origin") origin: String = "*",

@@ -6,9 +6,9 @@ import java.util.Locale
 /** Groups records that differ only by printing, binding, publisher, or another carrier detail. */
 fun List<PublicationEdition>.groupMeaningfulVariants(
     preferredLanguageCode: String,
-): List<PublicationEdition> = groupBy(PublicationEdition::meaningfulVariantKey)
-    .values
-    .map { records ->
+    originalLanguageCode: String? = null,
+): List<PublicationEdition> {
+    val variants = groupBy(PublicationEdition::meaningfulVariantKey).values.map { records ->
         val representative = records.maxWithOrNull(editionRepresentativeComparator())
             ?: records.first()
         representative.copy(
@@ -24,10 +24,7 @@ fun List<PublicationEdition>.groupMeaningfulVariants(
                 },
         )
     }
-    .sortedWith(
-        compareByDescending<PublicationEdition> { edition ->
-            edition.languageCode == preferredLanguageCode
-        }.thenByDescending { edition ->
+    val variantQuality = compareByDescending<PublicationEdition> { edition ->
             edition.accessOptions.any { access ->
                 access.availability == EditionAvailability.AVAILABLE
             }
@@ -37,8 +34,24 @@ fun List<PublicationEdition>.groupMeaningfulVariants(
                 TextEditionType.UNSPECIFIED -> 2
                 TextEditionType.HISTORICAL_ORTHOGRAPHY -> 1
             }
-        }.thenByDescending { edition -> edition.translator != null },
-    )
+        }.thenByDescending { edition -> edition.translator != null }
+    val languageOrder = buildList {
+        originalLanguageCode?.let(::add)
+        add(preferredLanguageCode)
+        addAll(PRIORITY_LANGUAGE_ORDER)
+        addAll(variants.map(PublicationEdition::languageCode))
+    }.distinct()
+    val variantsByLanguage = variants
+        .groupBy(PublicationEdition::languageCode)
+        .mapValues { (_, editions) -> editions.sortedWith(variantQuality) }
+    val firstVariantPerLanguage = languageOrder.mapNotNull { language ->
+        variantsByLanguage[language]?.firstOrNull()
+    }
+    val remainingVariants = languageOrder.flatMap { language ->
+        variantsByLanguage[language].orEmpty().drop(1)
+    }
+    return firstVariantPerLanguage + remainingVariants
+}
 
 private fun PublicationEdition.meaningfulVariantKey(): String = listOf(
     languageCode.lowercase(Locale.ROOT),
@@ -64,5 +77,9 @@ private fun String?.toVariantKey(): String = Normalizer
     .replace(NON_ALPHANUMERIC, "")
 
 private const val UNKNOWN_TRANSLATOR_KEY = "unknown"
+private val PRIORITY_LANGUAGE_ORDER = listOf(
+    "eng", "rus", "ukr", "spa", "fre", "ger", "ita", "pol",
+    "por", "chi", "jpn", "ara", "kor", "tur", "dut", "swe",
+)
 private val COMBINING_MARKS = Regex("\\p{M}+")
 private val NON_ALPHANUMERIC = Regex("[^\\p{L}\\p{N}]+")

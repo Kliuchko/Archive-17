@@ -36,6 +36,7 @@ import com.kliuchko.archive17.domain.model.PublicationEdition
 import com.kliuchko.archive17.domain.model.TextEditionType
 import com.kliuchko.archive17.domain.model.TemporaryBook
 import com.kliuchko.archive17.presentation.components.FreeBookCover
+import com.kliuchko.archive17.presentation.components.bookLanguageName
 import org.koin.androidx.compose.koinViewModel
 import org.koin.core.parameter.parametersOf
 
@@ -429,14 +430,7 @@ private fun DetailFact(label: String, value: String) {
 }
 
 @Composable
-private fun localizedBookLanguage(code: String): String = stringResource(
-    when (code) {
-        "rus" -> R.string.language_russian
-        "eng" -> R.string.language_english
-        "ita" -> R.string.language_italian
-        else -> R.string.language_other
-    },
-)
+private fun localizedBookLanguage(code: String): String = bookLanguageName(code)
 
 private fun formatFileSize(bytes: Long): String {
     val megabytes = bytes.toDouble() / (1024.0 * 1024.0)

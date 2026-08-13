@@ -737,8 +737,17 @@ class SearchViewModel(
         BookLanguage.ENGLISH -> "eng"
         BookLanguage.DEVICE -> runCatching {
             val systemLocale = Resources.getSystem().configuration.locales[0] ?: Locale.ENGLISH
-            systemLocale.isO3Language
+            systemLocale.isO3Language.toOpenLibraryLanguageCode()
         }.getOrDefault("eng")
+    }
+
+    private fun String.toOpenLibraryLanguageCode(): String = when (this) {
+        "deu" -> "ger"
+        "fra" -> "fre"
+        "zho" -> "chi"
+        "ces" -> "cze"
+        "nld" -> "dut"
+        else -> this
     }
 
     private fun editionPreference(selectedLanguageCode: String) =

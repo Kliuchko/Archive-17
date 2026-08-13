@@ -25,6 +25,7 @@ interface BookRepository {
     suspend fun getPublicationEditions(
         work: Work,
         preferredLanguageCode: String,
+        originalLanguageCode: String? = null,
     ): RepositoryResult<List<PublicationEdition>>
 
     fun observeLibrary(status: ReadingStatus? = null): Flow<List<LibraryBook>>

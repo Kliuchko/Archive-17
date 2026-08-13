@@ -46,6 +46,7 @@ import com.kliuchko.archive17.domain.model.TextEditionType
 import com.kliuchko.archive17.domain.model.TemporaryBook
 import com.kliuchko.archive17.presentation.components.ArchiveBrand
 import com.kliuchko.archive17.presentation.components.BookCover
+import com.kliuchko.archive17.presentation.components.bookLanguageName
 import com.kliuchko.archive17.presentation.components.EmptyMessage
 import com.kliuchko.archive17.presentation.components.FreeBookCover
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -252,6 +253,11 @@ private fun SearchResults(
             uiState.otherLanguageBooks.isNotEmpty() ||
             uiState.otherFreeBooks.isNotEmpty() -> {
             val listState = rememberLazyListState()
+            ResetCatalogScrollEffect(
+                listState = listState,
+                query = uiState.query,
+                mode = uiState.selectedMode,
+            )
             LoadNextPageEffect(
                 listState = listState,
                 enabled = uiState.canLoadMore && !uiState.isLoadingNextPage,
@@ -338,6 +344,11 @@ private fun SearchResults(
 
         uiState.books.isNotEmpty() -> {
             val listState = rememberLazyListState()
+            ResetCatalogScrollEffect(
+                listState = listState,
+                query = uiState.query,
+                mode = uiState.selectedMode,
+            )
             LoadNextPageEffect(
                 listState = listState,
                 enabled = uiState.canLoadMore && !uiState.isLoadingNextPage,
@@ -421,6 +432,17 @@ private fun LoadNextPageEffect(
             .collect { shouldLoad ->
                 if (shouldLoad) onLoadNextPage()
             }
+    }
+}
+
+@Composable
+private fun ResetCatalogScrollEffect(
+    listState: LazyListState,
+    query: String,
+    mode: CatalogMode,
+) {
+    LaunchedEffect(query.trim(), mode) {
+        listState.scrollToItem(0)
     }
 }
 
@@ -777,14 +799,7 @@ private fun CatalogWelcome(
 }
 
 @Composable
-private fun localizedLanguageName(code: String): String = stringResource(
-    when (code) {
-        "rus" -> R.string.language_russian
-        "eng" -> R.string.language_english
-        "ita" -> R.string.language_italian
-        else -> R.string.language_other
-    },
-)
+private fun localizedLanguageName(code: String): String = bookLanguageName(code)
 
 @Composable
 private fun Work.metadataLine(): String {

@@ -9,6 +9,7 @@ import com.kliuchko.archive17.domain.model.ReadingStatus
 import com.kliuchko.archive17.domain.model.toPublicationEdition
 import com.kliuchko.archive17.domain.model.groupMeaningfulVariants
 import com.kliuchko.archive17.domain.repository.BookRepository
+import com.kliuchko.archive17.domain.repository.BookQueryResolver
 import com.kliuchko.archive17.domain.repository.FreeBookRepository
 import com.kliuchko.archive17.domain.repository.LanguageSettingsRepository
 import com.kliuchko.archive17.domain.repository.RepositoryResult
@@ -19,12 +20,15 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import android.content.res.Resources
+import java.util.Locale
 
 class BookDetailsViewModel(
     private val workId: String,
     private val repository: BookRepository,
     private val freeBookRepository: FreeBookRepository,
     private val languageSettingsRepository: LanguageSettingsRepository,
+    private val queryResolver: BookQueryResolver,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(BookDetailsUiState(workId = workId))
     val uiState: StateFlow<BookDetailsUiState> = _uiState.asStateFlow()
@@ -201,22 +205,39 @@ class BookDetailsViewModel(
 
     private fun loadEditions(work: com.kliuchko.archive17.domain.model.Work) {
         viewModelScope.launch {
-            val languageCode = languageSettingsRepository.preferredBookLanguage.value.toCatalogCode()
+            val preferredBookLanguageCode =
+                languageSettingsRepository.preferredBookLanguage.value.toCatalogCode()
+            val deviceLanguageCode = deviceLanguageCode()
             _uiState.update { it.copy(isLoadingEditions = true) }
+            val resolvedOriginalLanguageCode = queryResolver.resolveOriginalLanguage(
+                query = work.title,
+                preferredLanguageCode = preferredBookLanguageCode,
+            )
             val (metadataResult, freeResult) = coroutineScope {
-                val metadata = async { repository.getPublicationEditions(work, languageCode) }
-                val free = async { loadFreeEditions(work.title, work.id, languageCode) }
+                val metadata = async {
+                    repository.getPublicationEditions(
+                        work = work,
+                        preferredLanguageCode = deviceLanguageCode,
+                        originalLanguageCode = resolvedOriginalLanguageCode,
+                    )
+                }
+                val free = async {
+                    loadFreeEditions(work.title, work.id, preferredBookLanguageCode)
+                }
                 metadata.await() to free.await()
             }
             val metadata = metadataResult.dataOrEmpty()
             val freeBooks = freeResult
             val freeEditions = freeBooks.map(FreeBook::toPublicationEdition)
+            val originalLanguageCode = resolvedOriginalLanguageCode
+                ?: inferOriginalLanguage(work, freeEditions + metadata)
             val editions = (freeEditions + metadata)
                 .distinctBy(PublicationEdition::id)
-                .groupMeaningfulVariants(languageCode)
+                .groupMeaningfulVariants(deviceLanguageCode, originalLanguageCode)
             _uiState.update {
                 it.copy(
                     editions = editions,
+                    originalLanguageCode = originalLanguageCode,
                     freeBooksByEditionId = freeBooks.associateBy(FreeBook::editionId),
                     isLoadingEditions = false,
                     showAllEditionVariants = false,
@@ -245,6 +266,45 @@ class BookDetailsViewModel(
     private fun BookLanguage.toCatalogCode(): String = when (this) {
         BookLanguage.RUSSIAN -> "rus"
         BookLanguage.ENGLISH -> "eng"
-        BookLanguage.DEVICE -> "eng"
+        BookLanguage.DEVICE -> runCatching {
+            val locale = Resources.getSystem().configuration.locales[0] ?: Locale.ENGLISH
+            locale.isO3Language.toOpenLibraryLanguageCode()
+        }.getOrDefault("eng")
+    }
+
+    private fun deviceLanguageCode(): String = runCatching {
+        val locale = Resources.getSystem().configuration.locales[0] ?: Locale.ENGLISH
+        locale.isO3Language.toOpenLibraryLanguageCode()
+    }.getOrDefault("eng")
+
+    private fun String.toOpenLibraryLanguageCode(): String = when (this) {
+        "deu" -> "ger"
+        "fra" -> "fre"
+        "zho" -> "chi"
+        "ces" -> "cze"
+        "nld" -> "dut"
+        else -> this
+    }
+
+    private fun inferOriginalLanguage(
+        work: com.kliuchko.archive17.domain.model.Work,
+        editions: List<PublicationEdition>,
+    ): String? {
+        val available = work.editionLanguages.toSet()
+        val scriptLanguage = when {
+            work.title.any { it in "іїєґІЇЄҐ" } -> "ukr"
+            work.title.any { it in '\u0400'..'\u04FF' } -> "rus"
+            work.title.any { it in '\u0600'..'\u06FF' } -> "ara"
+            work.title.any { it in '\u3040'..'\u30FF' } -> "jpn"
+            work.title.any { it in '\u4E00'..'\u9FFF' } -> "chi"
+            else -> null
+        }
+        if (scriptLanguage != null && scriptLanguage in available) return scriptLanguage
+        return editions
+            .filter { edition -> edition.publishedYear != null }
+            .minByOrNull { edition -> edition.publishedYear ?: Int.MAX_VALUE }
+            ?.languageCode
+            ?: "eng".takeIf(available::contains)
+            ?: available.firstOrNull()
     }
 }

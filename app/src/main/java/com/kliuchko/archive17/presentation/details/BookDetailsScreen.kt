@@ -39,6 +39,7 @@ import com.kliuchko.archive17.domain.model.EditionAvailability
 import com.kliuchko.archive17.domain.model.PublicationEdition
 import com.kliuchko.archive17.domain.model.TemporaryBook
 import com.kliuchko.archive17.presentation.components.BookCover
+import com.kliuchko.archive17.presentation.components.bookLanguageName
 import com.kliuchko.archive17.presentation.components.localizedDisplayName
 import org.koin.androidx.compose.koinViewModel
 import org.koin.core.parameter.parametersOf
@@ -224,6 +225,7 @@ fun BookDetailsScreen(
                             uiState.visibleEditions.forEach { edition ->
                                 WorkEditionCard(
                                     edition = edition,
+                                    isOriginal = edition.languageCode == uiState.originalLanguageCode,
                                     isFree = edition.id in uiState.freeBooksByEditionId,
                                     isBusy = uiState.readingEditionId != null ||
                                         uiState.downloadingEditionId != null,
@@ -275,7 +277,11 @@ fun BookDetailsScreen(
 
                 DetailsSection(title = stringResource(R.string.edition_language)) {
                     Text(
-                        text = uiState.languageLabel,
+                        text = work.editionLanguages
+                            .map { languageCode -> bookLanguageName(languageCode) }
+                            .distinct()
+                            .joinToString()
+                            .ifBlank { stringResource(R.string.language_other) },
                         style = MaterialTheme.typography.bodyMedium,
                     )
                 }
@@ -306,6 +312,7 @@ fun BookDetailsScreen(
 @Composable
 private fun WorkEditionCard(
     edition: PublicationEdition,
+    isOriginal: Boolean,
     isFree: Boolean,
     isBusy: Boolean,
     onRead: (() -> Unit)?,
@@ -323,7 +330,7 @@ private fun WorkEditionCard(
             Text(edition.title, style = MaterialTheme.typography.titleMedium)
             Text(
                 text = listOfNotNull(
-                    editionLanguageLabel(edition),
+                    editionLanguageLabel(edition, isOriginal),
                     edition.translator?.let { stringResource(R.string.edition_translator_value, it) },
                 ).joinToString(" · "),
                 style = MaterialTheme.typography.bodySmall,
@@ -332,6 +339,8 @@ private fun WorkEditionCard(
             Text(
                 text = if (isFree) {
                     stringResource(R.string.edition_access_free)
+                } else if (access == null) {
+                    stringResource(R.string.edition_details_pending)
                 } else {
                     accessLabel(access?.mode, access?.availability)
                 },
@@ -377,17 +386,10 @@ private fun WorkEditionCard(
 }
 
 @Composable
-private fun editionLanguageName(code: String): String = stringResource(
-    when (code) {
-        "rus" -> R.string.language_russian
-        "eng" -> R.string.language_english
-        "ita" -> R.string.language_italian
-        else -> R.string.language_other
-    },
-)
+private fun editionLanguageName(code: String): String = bookLanguageName(code)
 
 @Composable
-private fun editionLanguageLabel(edition: PublicationEdition): String {
+private fun editionLanguageLabel(edition: PublicationEdition, isOriginal: Boolean): String {
     val language = editionLanguageName(edition.languageCode)
     val qualifier = when (edition.textEditionType) {
         com.kliuchko.archive17.domain.model.TextEditionType.HISTORICAL_ORTHOGRAPHY ->
@@ -396,7 +398,12 @@ private fun editionLanguageLabel(edition: PublicationEdition): String {
             stringResource(R.string.edition_language_modern)
         com.kliuchko.archive17.domain.model.TextEditionType.UNSPECIFIED -> null
     }
-    return qualifier?.let { "$language ($it)" } ?: language
+    val languageWithEdition = qualifier?.let { "$language ($it)" } ?: language
+    return if (isOriginal) {
+        stringResource(R.string.edition_original_language, languageWithEdition)
+    } else {
+        languageWithEdition
+    }
 }
 
 @Composable

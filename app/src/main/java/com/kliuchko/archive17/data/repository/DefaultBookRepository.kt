@@ -164,16 +164,27 @@ class DefaultBookRepository(
     override suspend fun getPublicationEditions(
         work: Work,
         preferredLanguageCode: String,
+        originalLanguageCode: String?,
     ): RepositoryResult<List<PublicationEdition>> = runRepositoryCatching(
         errorMessage = "Не удалось загрузить издания книги.",
     ) {
-        val fallbackLanguageCode = if (preferredLanguageCode == ENGLISH_EDITION_LANGUAGE) {
-            RUSSIAN_EDITION_LANGUAGE
-        } else {
-            ENGLISH_EDITION_LANGUAGE
+        val availableLanguages = work.editionLanguages.toSet()
+        val languageCodes = buildList {
+            originalLanguageCode?.let(::add)
+            add(preferredLanguageCode)
+            addAll(PRIORITY_EDITION_LANGUAGES)
         }
-        val languageCodes = listOf(preferredLanguageCode, fallbackLanguageCode)
             .filter { it.matches(EDITION_LANGUAGE_PATTERN) }
+            .filter { language ->
+                availableLanguages.isEmpty() || language in availableLanguages
+            }
+            .distinct()
+            .take(MAX_PRIORITY_EDITION_LANGUAGES)
+        val targetedLanguageCodes = listOfNotNull(
+            originalLanguageCode,
+            preferredLanguageCode,
+        )
+            .filter(languageCodes::contains)
             .distinct()
         val (workEditions, searchResponses) = coroutineScope {
             val editions = async {
@@ -181,7 +192,7 @@ class DefaultBookRepository(
                     api.getWorkEditions(work.id).toPublicationEditions(work)
                 }.getOrDefault(emptyList())
             }
-            languageCodes.map { languageCode ->
+            targetedLanguageCodes.map { languageCode ->
                 async {
                     runCatching {
                         languageCode to api.searchEditionMetadata(
@@ -198,7 +209,21 @@ class DefaultBookRepository(
                 response.toPublicationEditions(languageCode)
             }
             .filter { edition -> edition.workId == work.id }
-        val editions = (workEditions + metadataEditions)
+        val resolvedEditions = workEditions + metadataEditions
+        val languagePlaceholders = languageCodes
+            .filterNot { languageCode ->
+                resolvedEditions.any { edition -> edition.languageCode == languageCode }
+            }
+            .map { languageCode ->
+                PublicationEdition(
+                    id = "language:${work.id}:$languageCode",
+                    workId = work.id,
+                    title = work.title,
+                    authors = work.authors,
+                    languageCode = languageCode,
+                )
+            }
+        val editions = (resolvedEditions + languagePlaceholders)
             .distinctBy(PublicationEdition::id)
             .sortedWith(
                 compareByDescending<PublicationEdition> {
@@ -269,8 +294,11 @@ class DefaultBookRepository(
         const val DEFAULT_CACHE_FRESHNESS_MILLIS = 24L * 60L * 60L * 1000L
         private const val CACHED_SEARCH_SCAN_LIMIT = 200
         private const val CACHED_SEARCH_RESULT_LIMIT = 50
-        private const val ENGLISH_EDITION_LANGUAGE = "eng"
-        private const val RUSSIAN_EDITION_LANGUAGE = "rus"
+        private const val MAX_PRIORITY_EDITION_LANGUAGES = 14
+        private val PRIORITY_EDITION_LANGUAGES = listOf(
+            "eng", "rus", "ukr", "spa", "fre", "ger", "ita", "pol",
+            "por", "chi", "jpn", "ara", "kor", "tur", "dut", "swe",
+        )
         private val EDITION_LANGUAGE_PATTERN = Regex("[a-z]{3}")
         private val WORK_POPULARITY_ORDER =
             compareByDescending<Work> { it.editionCount ?: 0 }

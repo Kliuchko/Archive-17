@@ -1,5 +1,7 @@
 package com.kliuchko.archive17.data.networking.dto
 
+import com.google.gson.JsonElement
+
 data class WikidataSearchResponseDto(
     val search: List<WikidataSearchItemDto> = emptyList(),
 )
@@ -25,6 +27,19 @@ data class WikidataEntityDto(
     val labels: Map<String, WikidataTermDto> = emptyMap(),
     val aliases: Map<String, List<WikidataTermDto>> = emptyMap(),
     val descriptions: Map<String, WikidataTermDto> = emptyMap(),
+    val claims: Map<String, List<WikidataClaimDto>> = emptyMap(),
+)
+
+data class WikidataClaimDto(
+    val mainsnak: WikidataSnakDto? = null,
+)
+
+data class WikidataSnakDto(
+    val datavalue: WikidataDataValueDto? = null,
+)
+
+data class WikidataDataValueDto(
+    val value: JsonElement? = null,
 )
 
 data class WikidataTermDto(

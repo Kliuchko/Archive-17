@@ -17,6 +17,7 @@ import com.kliuchko.archive17.data.networking.dto.OpenLibraryWorkDto
 import com.kliuchko.archive17.data.networking.dto.OpenLibraryWorkEditionsDto
 import com.kliuchko.archive17.domain.model.ReadingStatus
 import com.kliuchko.archive17.domain.model.Work
+import com.kliuchko.archive17.domain.model.groupMeaningfulVariants
 import com.kliuchko.archive17.domain.repository.RepositoryResult
 import com.kliuchko.archive17.domain.repository.BookQueryResolver
 import java.io.IOException
@@ -148,6 +149,26 @@ class DefaultBookRepositoryTest {
     }
 
     @Test
+    fun `edition languages keep original first and device language second`() = runBlocking {
+        val work = sampleWork(lastUpdatedAt = null).copy(
+            editionLanguages = listOf("eng", "rus", "ukr"),
+        )
+
+        val result = repository.getPublicationEditions(
+            work = work,
+            preferredLanguageCode = "rus",
+            originalLanguageCode = "eng",
+        )
+
+        require(result is RepositoryResult.Success)
+        val languages = result.data
+            .groupMeaningfulVariants("rus", originalLanguageCode = "eng")
+            .map { edition -> edition.languageCode }
+        assertEquals(listOf("eng", "rus", "ukr"), languages)
+        assertEquals(setOf("eng", "rus"), api.editionSearchLanguages.toSet())
+    }
+
+    @Test
     fun `observe details marks stale cached work and exposes local library status`() = runBlocking {
         val oldTimestamp = 1_000L - DefaultBookRepository.DEFAULT_CACHE_FRESHNESS_MILLIS
         workDao.upsertWork(sampleWork(lastUpdatedAt = oldTimestamp).toEntity(now = oldTimestamp))
@@ -247,6 +268,7 @@ private class FakeOpenLibraryApi : OpenLibraryApi {
     var lastSearchPage = 1
     var lastSearchQuery = ""
     val searchQueries = mutableListOf<String>()
+    val editionSearchLanguages = mutableListOf<String>()
 
     override suspend fun searchBooks(
         query: String,
@@ -285,6 +307,7 @@ private class FakeOpenLibraryApi : OpenLibraryApi {
         responseLanguage: String,
     ): OpenLibrarySearchResponseDto {
         searchCallCount += 1
+        editionSearchLanguages += language
         searchError?.let { throw it }
         return searchResponse
     }

@@ -18,11 +18,12 @@ class EditionVariantGrouperTest {
             edition("original", "eng"),
         )
 
-        val variants = editions.groupMeaningfulVariants("rus")
+        val variants = editions.groupMeaningfulVariants("rus", originalLanguageCode = "eng")
 
         assertEquals(4, variants.size)
         assertEquals(3, variants.count { it.languageCode == "rus" })
         assertEquals(1, variants.count { it.translator == "Иван Петров" })
+        assertEquals("eng", variants.first().languageCode)
     }
 
     private fun edition(

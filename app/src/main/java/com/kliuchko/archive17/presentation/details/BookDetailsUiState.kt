@@ -15,6 +15,7 @@ data class BookDetailsUiState(
     val isCached: Boolean = false,
     val isStale: Boolean = false,
     val editions: List<PublicationEdition> = emptyList(),
+    val originalLanguageCode: String? = null,
     val freeBooksByEditionId: Map<String, FreeBook> = emptyMap(),
     val isLoadingEditions: Boolean = false,
     val showAllEditionVariants: Boolean = false,
@@ -42,7 +43,7 @@ data class BookDetailsUiState(
     val languageLabel: String
         get() = work?.editionLanguages
             .orEmpty()
-            .takeIf { it.isNotEmpty() }
+            .takeIf(List<String>::isNotEmpty)
             ?.joinToString()
             ?: "Не указан"
 

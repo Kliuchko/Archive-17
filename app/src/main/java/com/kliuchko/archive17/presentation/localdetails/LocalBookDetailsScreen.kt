@@ -34,6 +34,7 @@ import com.kliuchko.archive17.R
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.kliuchko.archive17.domain.model.ReadingStatus
 import com.kliuchko.archive17.presentation.components.LocalBookCover
+import com.kliuchko.archive17.presentation.components.bookLanguageName
 import com.kliuchko.archive17.presentation.components.localizedDisplayName
 import org.koin.androidx.compose.koinViewModel
 import org.koin.core.parameter.parametersOf
@@ -264,14 +265,7 @@ private fun BookFact(
 }
 
 @Composable
-private fun localizedBookLanguage(code: String): String = stringResource(
-    when (code) {
-        "rus" -> R.string.language_russian
-        "eng" -> R.string.language_english
-        "ita" -> R.string.language_italian
-        else -> R.string.language_other
-    },
-)
+private fun localizedBookLanguage(code: String): String = bookLanguageName(code)
 
 @Composable
 private fun EditMetadataDialog(

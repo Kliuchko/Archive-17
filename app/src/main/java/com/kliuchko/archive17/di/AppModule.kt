@@ -174,6 +174,7 @@ val appModule = module {
             repository = get(),
             freeBookRepository = get(),
             languageSettingsRepository = get(),
+            queryResolver = get(),
         )
     }
 

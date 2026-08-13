@@ -211,6 +211,7 @@
     <string name="edition_language_historical">historical orthography</string>
     <string name="edition_language_modern">modern orthography</string>
     <string name="edition_variants_available">Other text variants available</string>
+    <string name="edition_original_language">Original · %1$s</string>
     <string name="access_label">Access</string>
     <string name="rights_basis_label">Access basis</string>
     <string name="rights_open_license">Open source license</string>
