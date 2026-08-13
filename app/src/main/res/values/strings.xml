@@ -144,6 +144,7 @@
     <string name="reader_font_serif">Книжный</string>
     <string name="reader_font_sans">Нейтральный</string>
     <string name="reader_line_height">Интервал</string>
+    <string name="reader_line_height_soon">Интервал · Скоро</string>
     <string name="reader_line_compact">Плотно</string>
     <string name="reader_line_normal">Обычно</string>
     <string name="reader_line_relaxed">Свободно</string>

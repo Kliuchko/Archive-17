@@ -144,6 +144,7 @@
     <string name="reader_font_serif">Book</string>
     <string name="reader_font_sans">Neutral</string>
     <string name="reader_line_height">Spacing</string>
+    <string name="reader_line_height_soon">Spacing · Soon</string>
     <string name="reader_line_compact">Compact</string>
     <string name="reader_line_normal">Normal</string>
     <string name="reader_line_relaxed">Relaxed</string>

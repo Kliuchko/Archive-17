@@ -65,11 +65,12 @@ internal fun ReaderSettingsPanel(
                 )
             }
         }
-        ReaderSettingRow(label = stringResource(R.string.reader_line_height)) {
+        ReaderSettingRow(label = stringResource(R.string.reader_line_height_soon)) {
             LINE_HEIGHTS.forEach { lineHeight ->
                 FilterChip(
                     selected = preferences.lineHeight == lineHeight.value,
                     onClick = { onChange(preferences.copy(lineHeight = lineHeight.value)) },
+                    enabled = false,
                     label = { Text(stringResource(lineHeight.labelRes)) },
                 )
             }

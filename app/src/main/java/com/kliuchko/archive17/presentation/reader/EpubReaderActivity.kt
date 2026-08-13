@@ -261,7 +261,7 @@ class EpubReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener {
             Archive17Theme(darkTheme = readerPreferences.theme == ReaderTheme.DARK) {
                 Column {
                     Surface(
-                        color = readerPreferences.toolbarColor().copy(alpha = 0.94f),
+                        color = readerPreferences.toolbarColor().copy(alpha = 0.98f),
                         shadowElevation = 5.dp,
                     ) {
                         Row(
@@ -602,7 +602,7 @@ private fun ReaderFloatingPanel(
             .fillMaxWidth()
             .padding(horizontal = 8.dp, vertical = 6.dp),
         shape = RoundedCornerShape(18.dp),
-        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f),
+        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.97f),
         tonalElevation = 4.dp,
         shadowElevation = 8.dp,
     ) {
