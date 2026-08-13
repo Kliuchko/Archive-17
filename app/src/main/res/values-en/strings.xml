@@ -168,6 +168,7 @@
     <string name="downloading_book">Downloading…</string>
     <string name="checking_epub">Checking EPUB…</string>
     <string name="catalog_loading_books">Finding books…</string>
+    <string name="shelf_loading">Opening your Shelf…</string>
     <string name="catalog_loading_more">Opening the next shelf…</string>
     <string name="catalog_next_page_error">The next shelf could not be opened yet.</string>
     <string name="free_catalog_empty">No open EPUBs found in the selected language</string>

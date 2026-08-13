@@ -1,6 +1,9 @@
 package com.kliuchko.archive17.presentation.search
 
 import androidx.compose.foundation.clickable
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -53,6 +56,7 @@ import com.kliuchko.archive17.domain.model.TextEditionType
 import com.kliuchko.archive17.domain.model.TemporaryBook
 import com.kliuchko.archive17.presentation.components.ArchiveBrand
 import com.kliuchko.archive17.presentation.components.ArchiveFloatingHeader
+import com.kliuchko.archive17.presentation.components.ArchiveLoadingState
 import com.kliuchko.archive17.presentation.components.BookCover
 import com.kliuchko.archive17.presentation.components.bookLanguageName
 import com.kliuchko.archive17.presentation.components.EmptyMessage
@@ -345,7 +349,11 @@ private fun SearchResults(
                         }
                     }
                 }
-                if (uiState.isLoading || uiState.isCheckingFreeBooks) {
+                AnimatedVisibility(
+                    visible = uiState.isLoading || uiState.isCheckingFreeBooks,
+                    enter = fadeIn(),
+                    exit = fadeOut(),
+                ) {
                     LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
                 }
             }
@@ -416,7 +424,11 @@ private fun SearchResults(
                         }
                     }
                 }
-                if (uiState.isLoading) {
+                AnimatedVisibility(
+                    visible = uiState.isLoading,
+                    enter = fadeIn(),
+                    exit = fadeOut(),
+                ) {
                     LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
                 }
             }
@@ -707,18 +719,10 @@ private fun CatalogLoadingPlaceholder(
         userScrollEnabled = false,
     ) {
         item {
-            Row(
+            ArchiveLoadingState(
+                label = stringResource(R.string.catalog_loading_books),
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                CircularProgressIndicator(modifier = Modifier.width(20.dp))
-                Text(
-                    text = stringResource(R.string.catalog_loading_books),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
+            )
         }
         items(count = 4) {
             Card(

@@ -168,6 +168,7 @@
     <string name="downloading_book">Загружаем…</string>
     <string name="checking_epub">Проверяем EPUB…</string>
     <string name="catalog_loading_books">Подбираем книги…</string>
+    <string name="shelf_loading">Открываем Полку…</string>
     <string name="catalog_loading_more">Открываем следующий стеллаж…</string>
     <string name="catalog_next_page_error">Следующий стеллаж пока не открылся.</string>
     <string name="free_catalog_empty">Открытых EPUB на выбранном языке не найдено</string>

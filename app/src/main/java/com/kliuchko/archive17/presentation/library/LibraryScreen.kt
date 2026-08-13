@@ -43,6 +43,8 @@ import com.kliuchko.archive17.domain.model.LibraryBook
 import com.kliuchko.archive17.domain.model.LocalBook
 import com.kliuchko.archive17.presentation.components.ArchiveBrand
 import com.kliuchko.archive17.presentation.components.ArchiveFloatingHeader
+import com.kliuchko.archive17.presentation.components.ArchiveLoadingState
+import com.kliuchko.archive17.presentation.components.ArchiveStateIllustration
 import com.kliuchko.archive17.presentation.components.BookCover
 import com.kliuchko.archive17.presentation.components.LocalBookCover
 import com.kliuchko.archive17.presentation.components.localizedDisplayName
@@ -84,7 +86,8 @@ fun LibraryScreen(
         ) {
             when {
                 uiState.isLoading -> {
-                    CircularProgressIndicator(
+                    ArchiveLoadingState(
+                        label = stringResource(R.string.shelf_loading),
                         modifier = Modifier
                             .align(Alignment.Center)
                             .padding(top = headerPadding),
@@ -277,13 +280,16 @@ private fun EmptyShelf(
         ) {
             Column(
                 modifier = Modifier.padding(20.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(7.dp),
             ) {
+                ArchiveStateIllustration(height = 126.dp)
                 Text(
                     text = stringResource(
                         if (selectedFilter == LibraryFilter.ALL) R.string.shelf_empty else R.string.shelf_section_empty,
                     ),
                     style = MaterialTheme.typography.titleLarge,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                 )
                 Text(
                     text = if (selectedFilter == LibraryFilter.ALL) {
@@ -293,6 +299,7 @@ private fun EmptyShelf(
                     },
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                 )
                 if (selectedFilter == LibraryFilter.ALL) {
                     Text(

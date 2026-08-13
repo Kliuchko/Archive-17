@@ -10,15 +10,18 @@ import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
+import androidx.compose.foundation.Image
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -28,6 +31,7 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -35,6 +39,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
+import com.kliuchko.archive17.R
 import com.kliuchko.archive17.data.networking.CoverSize
 import com.kliuchko.archive17.data.networking.CoverUrlBuilder
 import com.kliuchko.archive17.domain.model.Work
@@ -99,6 +104,47 @@ fun ArchiveBrand(
             text = "ARCHIVE 17",
             style = MaterialTheme.typography.labelMedium,
             letterSpacing = MaterialTheme.typography.labelMedium.letterSpacing * 1.5f,
+        )
+    }
+}
+
+@Composable
+fun ArchiveStateIllustration(
+    modifier: Modifier = Modifier,
+    height: Dp = 142.dp,
+) {
+    Image(
+        painter = painterResource(R.drawable.archive_empty_state),
+        contentDescription = null,
+        modifier = modifier.height(height),
+        contentScale = ContentScale.Fit,
+        alpha = 0.9f,
+    )
+}
+
+@Composable
+fun ArchiveLoadingState(
+    label: String,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier.padding(24.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(14.dp),
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            CircularProgressIndicator(
+                modifier = Modifier.size(58.dp),
+                color = MaterialTheme.colorScheme.primary,
+                strokeWidth = 2.dp,
+            )
+            ArchiveMark(size = 38.dp)
+        }
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
         )
     }
 }
@@ -274,24 +320,37 @@ fun GeneratedCover(
     height: Dp = 86.dp,
 ) {
     val shape = RoundedCornerShape(topStart = 5.dp, topEnd = 9.dp, bottomEnd = 9.dp, bottomStart = 5.dp)
+    val paletteIndex = remember(title) { Math.floorMod(title.hashCode(), 4) }
+    val containerColor = when (paletteIndex) {
+        0 -> MaterialTheme.colorScheme.tertiary
+        1 -> MaterialTheme.colorScheme.secondary
+        2 -> MaterialTheme.colorScheme.primary
+        else -> MaterialTheme.colorScheme.surfaceVariant
+    }
+    val contentColor = when (paletteIndex) {
+        0 -> MaterialTheme.colorScheme.onTertiary
+        1 -> MaterialTheme.colorScheme.onSecondary
+        2 -> MaterialTheme.colorScheme.onPrimary
+        else -> MaterialTheme.colorScheme.onSurfaceVariant
+    }
     Box(
         modifier = modifier
             .size(width = width, height = height)
             .clip(shape)
-            .background(MaterialTheme.colorScheme.tertiary),
+            .background(containerColor),
         contentAlignment = Alignment.Center,
     ) {
         Box(
             modifier = Modifier
                 .align(Alignment.CenterStart)
                 .size(width = 5.dp, height = height)
-                .background(MaterialTheme.colorScheme.onTertiary.copy(alpha = 0.16f)),
+                .background(contentColor.copy(alpha = 0.16f)),
         )
         Text(
             text = title.uppercase(),
             modifier = Modifier.padding(horizontal = 8.dp),
             style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onTertiary,
+            color = contentColor,
             textAlign = TextAlign.Center,
             maxLines = 4,
             overflow = TextOverflow.Ellipsis,
@@ -404,6 +463,7 @@ fun EmptyMessage(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
+        ArchiveStateIllustration()
         Text(
             text = title,
             style = MaterialTheme.typography.headlineSmall,

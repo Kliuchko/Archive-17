@@ -38,6 +38,7 @@ import com.kliuchko.archive17.domain.model.ReadingStatus
 import com.kliuchko.archive17.presentation.components.ArchiveBrand
 import com.kliuchko.archive17.presentation.components.ArchiveNavIcon
 import com.kliuchko.archive17.presentation.components.ArchiveNavigationIcon
+import com.kliuchko.archive17.presentation.components.ArchiveStateIllustration
 import com.kliuchko.archive17.presentation.components.BookCover
 import com.kliuchko.archive17.presentation.components.LocalBookCover
 import com.kliuchko.archive17.presentation.components.SectionHeading
@@ -331,25 +332,32 @@ private fun EmptyReadingRoom(
         shape = RoundedCornerShape(18.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
     ) {
-        Column(
+        Row(
             modifier = Modifier.padding(18.dp),
-            verticalArrangement = Arrangement.spacedBy(7.dp),
+            horizontalArrangement = Arrangement.spacedBy(14.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(
-                text = stringResource(R.string.reading_room_quiet),
-                style = MaterialTheme.typography.titleLarge,
-            )
-            Text(
-                text = stringResource(R.string.reading_room_invitation),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Text(
-                text = stringResource(R.string.open_catalog),
-                modifier = Modifier.padding(top = 5.dp),
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.primary,
-            )
+            ArchiveStateIllustration(height = 92.dp)
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(7.dp),
+            ) {
+                Text(
+                    text = stringResource(R.string.reading_room_quiet),
+                    style = MaterialTheme.typography.titleLarge,
+                )
+                Text(
+                    text = stringResource(R.string.reading_room_invitation),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Text(
+                    text = stringResource(R.string.open_catalog),
+                    modifier = Modifier.padding(top = 5.dp),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            }
         }
     }
 }

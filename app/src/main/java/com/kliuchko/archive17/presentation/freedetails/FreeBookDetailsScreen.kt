@@ -43,6 +43,8 @@ import com.kliuchko.archive17.domain.model.TextEditionType
 import com.kliuchko.archive17.domain.model.TemporaryBook
 import com.kliuchko.archive17.presentation.components.FreeBookCover
 import com.kliuchko.archive17.presentation.components.ArchiveFloatingHeader
+import com.kliuchko.archive17.presentation.components.ArchiveLoadingState
+import com.kliuchko.archive17.presentation.components.EmptyMessage
 import com.kliuchko.archive17.presentation.components.bookLanguageName
 import org.koin.androidx.compose.koinViewModel
 import org.koin.core.parameter.parametersOf
@@ -92,13 +94,13 @@ fun FreeBookDetailsScreen(
                     .padding(vertical = 96.dp),
                 contentAlignment = Alignment.Center,
             ) {
-                CircularProgressIndicator()
+                ArchiveLoadingState(label = stringResource(R.string.opening_book))
             }
 
-            uiState.details == null -> Text(
-                text = uiState.errorMessage ?: stringResource(R.string.book_unavailable),
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.error,
+            uiState.details == null -> EmptyMessage(
+                title = stringResource(R.string.book_unavailable),
+                body = uiState.errorMessage ?: stringResource(R.string.book_unavailable_details),
+                modifier = Modifier.fillMaxWidth(),
             )
 
             else -> {

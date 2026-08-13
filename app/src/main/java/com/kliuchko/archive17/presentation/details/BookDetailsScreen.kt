@@ -3,6 +3,7 @@
 package com.kliuchko.archive17.presentation.details
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
@@ -47,6 +48,8 @@ import com.kliuchko.archive17.domain.model.PublicationEdition
 import com.kliuchko.archive17.domain.model.TemporaryBook
 import com.kliuchko.archive17.presentation.components.BookCover
 import com.kliuchko.archive17.presentation.components.ArchiveFloatingHeader
+import com.kliuchko.archive17.presentation.components.ArchiveLoadingState
+import com.kliuchko.archive17.presentation.components.EmptyMessage
 import com.kliuchko.archive17.presentation.components.bookLanguageName
 import com.kliuchko.archive17.presentation.components.localizedDisplayName
 import org.koin.androidx.compose.koinViewModel
@@ -97,20 +100,20 @@ fun BookDetailsScreen(
                         .padding(vertical = 96.dp),
                     contentAlignment = Alignment.Center,
                 ) {
-                    CircularProgressIndicator()
+                    ArchiveLoadingState(label = stringResource(R.string.opening_book))
                 }
             }
 
             uiState.work == null -> {
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text(
-                        text = stringResource(R.string.book_unavailable),
-                        style = MaterialTheme.typography.headlineSmall,
-                    )
-                    Text(
-                        text = uiState.errorMessage ?: stringResource(R.string.book_unavailable_details),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    EmptyMessage(
+                        title = stringResource(R.string.book_unavailable),
+                        body = uiState.errorMessage
+                            ?: stringResource(R.string.book_unavailable_details),
                     )
                     Button(onClick = viewModel::refresh) {
                         Text(text = stringResource(R.string.retry))
@@ -580,7 +583,9 @@ private fun DetailsSection(
     content: @Composable () -> Unit,
 ) {
     Column(
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier
+            .fillMaxWidth()
+            .animateContentSize(),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Text(

@@ -38,6 +38,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.kliuchko.archive17.domain.model.ReadingStatus
 import com.kliuchko.archive17.presentation.components.LocalBookCover
 import com.kliuchko.archive17.presentation.components.ArchiveFloatingHeader
+import com.kliuchko.archive17.presentation.components.ArchiveLoadingState
+import com.kliuchko.archive17.presentation.components.EmptyMessage
 import com.kliuchko.archive17.presentation.components.bookLanguageName
 import com.kliuchko.archive17.presentation.components.localizedDisplayName
 import org.koin.androidx.compose.koinViewModel
@@ -77,12 +79,14 @@ fun LocalBookDetailsScreen(
                     .fillMaxWidth()
                     .padding(vertical = 96.dp),
                 contentAlignment = Alignment.Center,
-            ) { CircularProgressIndicator() }
+            ) {
+                ArchiveLoadingState(label = stringResource(R.string.opening_book))
+            }
 
-            uiState.book == null -> Text(
-                text = uiState.errorMessage ?: stringResource(R.string.book_unavailable),
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.error,
+            uiState.book == null -> EmptyMessage(
+                title = stringResource(R.string.book_unavailable),
+                body = uiState.errorMessage ?: stringResource(R.string.book_unavailable_details),
+                modifier = Modifier.fillMaxWidth(),
             )
 
             else -> {
