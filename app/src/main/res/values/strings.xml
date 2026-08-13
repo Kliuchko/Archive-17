@@ -193,6 +193,12 @@
     <string name="edition_details_label">Издание</string>
     <string name="available_editions">Доступные издания</string>
     <string name="available_editions_body">Переводы, оригиналы и другие версии этого произведения.</string>
+    <plurals name="available_edition_count">
+        <item quantity="one">%d доступное издание</item>
+        <item quantity="few">%d доступных издания</item>
+        <item quantity="many">%d доступных изданий</item>
+        <item quantity="other">%d доступных издания</item>
+    </plurals>
     <string name="access_label">Доступ</string>
     <string name="rights_basis_label">Основание доступа</string>
     <string name="rights_open_license">Открытая лицензия источника</string>

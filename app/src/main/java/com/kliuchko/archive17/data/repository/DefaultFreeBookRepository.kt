@@ -189,7 +189,7 @@ class DefaultFreeBookRepository(
             .filter { candidate -> candidate.workId == book.workId }
             .distinctBy(FreeBook::editionId)
             .map(FreeBook::toPublicationEdition)
-            .sortedWith(PUBLICATION_EDITION_PREFERENCE)
+            .sortedWith(publicationEditionPreference(book.languageCode))
             .toList()
 
         if (book.source == FreeBookSource.WIKISOURCE) {
@@ -609,14 +609,18 @@ class DefaultFreeBookRepository(
         const val STANDARD_EBOOKS_HOST = "standardebooks.org"
         val ISO_639_2_PATTERN = Regex("[a-z]{3}")
         val ARCHIVE_IDENTIFIER_PATTERN = Regex("[A-Za-z0-9._-]+")
-        val PUBLICATION_EDITION_PREFERENCE = compareByDescending<PublicationEdition> { edition ->
-                when (edition.textEditionType) {
-                    TextEditionType.MODERN_ORTHOGRAPHY -> 3
-                    TextEditionType.UNSPECIFIED -> 2
-                    TextEditionType.HISTORICAL_ORTHOGRAPHY -> 1
-                }
-            }.thenByDescending { edition -> edition.languageCode == RUSSIAN_LANGUAGE }
     }
+
+    private fun publicationEditionPreference(selectedLanguageCode: String) =
+        compareByDescending<PublicationEdition> { edition ->
+            edition.languageCode == selectedLanguageCode
+        }.thenByDescending { edition ->
+            when (edition.textEditionType) {
+                TextEditionType.MODERN_ORTHOGRAPHY -> 3
+                TextEditionType.UNSPECIFIED -> 2
+                TextEditionType.HISTORICAL_ORTHOGRAPHY -> 1
+            }
+        }
 }
 
 internal fun File.hasEpubSignature(): Boolean {

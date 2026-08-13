@@ -91,6 +91,9 @@ class SearchViewModel(
                 } else {
                     it.otherFreeBooks
                 },
+                editionCountsByWorkId = if (
+                    normalizedLength in 1 until SearchUiState.MIN_QUERY_LENGTH
+                ) emptyMap() else it.editionCountsByWorkId,
                 books = if (normalizedLength in 1 until SearchUiState.MIN_QUERY_LENGTH) {
                     emptyList()
                 } else {
@@ -119,6 +122,7 @@ class SearchViewModel(
                 alternativeEditionBooks = emptyList(),
                 otherLanguageBooks = emptyList(),
                 otherFreeBooks = emptyList(),
+                editionCountsByWorkId = emptyMap(),
                 errorMessage = null,
                 actionMessage = null,
                 isFreeCatalogFallback = false,
@@ -235,6 +239,7 @@ class SearchViewModel(
                     alternativeEditionBooks = emptyList(),
                     otherLanguageBooks = emptyList(),
                     otherFreeBooks = emptyList(),
+                    editionCountsByWorkId = emptyMap(),
                     errorMessage = null,
                     actionMessage = null,
                     isFreeCatalogFallback = false,
@@ -260,6 +265,7 @@ class SearchViewModel(
                 alternativeEditionBooks = emptyList(),
                 otherLanguageBooks = emptyList(),
                 otherFreeBooks = emptyList(),
+                editionCountsByWorkId = emptyMap(),
                 isFreeCatalogFallback = false,
                 selectedMode = request.mode,
                 bookLanguageCode = request.languageCode,
@@ -319,6 +325,7 @@ class SearchViewModel(
                 alternativeEditionBooks = emptyList(),
                 otherLanguageBooks = emptyList(),
                 otherFreeBooks = emptyList(),
+                editionCountsByWorkId = emptyMap(),
                 errorMessage = null,
                 actionMessage = null,
                 isFreeCatalogFallback = true,
@@ -371,6 +378,7 @@ class SearchViewModel(
                     alternativeEditionBooks = emptyList(),
                     otherLanguageBooks = emptyList(),
                     otherFreeBooks = emptyList(),
+                    editionCountsByWorkId = emptyMap(),
                 )
             }
             return
@@ -391,6 +399,7 @@ class SearchViewModel(
                     alternativeEditionBooks = classified.alternatives,
                     otherLanguageBooks = classified.otherLanguages,
                     otherFreeBooks = classified.other,
+                    editionCountsByWorkId = classified.editionCounts,
                 )
             }
             is RepositoryResult.Cached -> _uiState.update {
@@ -402,6 +411,7 @@ class SearchViewModel(
                     alternativeEditionBooks = classified.alternatives,
                     otherLanguageBooks = classified.otherLanguages,
                     otherFreeBooks = classified.other,
+                    editionCountsByWorkId = classified.editionCounts,
                     actionMessage = availability.message,
                 )
             }
@@ -412,7 +422,10 @@ class SearchViewModel(
                     freeBooks = emptyList(),
                     alternativeEditionBooks = emptyList(),
                     otherLanguageBooks = emptyList(),
-                    otherFreeBooks = candidates,
+                    otherFreeBooks = candidates.distinctBy { book ->
+                        book.workId.ifBlank { book.catalogTitleKey }
+                    },
+                    editionCountsByWorkId = candidates.editionCounts(),
                     actionMessage = availability.message,
                 )
             }
@@ -449,20 +462,20 @@ class SearchViewModel(
         selectedLanguageCode: String,
     ): ClassifiedFreeBooks {
         val verifiedIds = verified.mapTo(mutableSetOf(), FreeBook::editionId)
-        val groupedSelected = verified
-            .filter { it.languageCode == selectedLanguageCode }
+        val groupedEditions = verified
             .distinctBy(FreeBook::editionId)
-            .groupBy(FreeBook::catalogTitleKey)
+            .groupBy { book -> book.workId.ifBlank { book.catalogTitleKey } }
             .values
-            .map { editions -> editions.sortedWith(EDITION_PREFERENCE) }
+            .map { editions -> editions.sortedWith(editionPreference(selectedLanguageCode)) }
+        val verifiedWorkIds = verified.mapTo(mutableSetOf(), FreeBook::workId)
+        val remaining = filterNot { it.editionId in verifiedIds }
         return ClassifiedFreeBooks(
-            verified = groupedSelected.mapNotNull(List<FreeBook>::firstOrNull),
-            alternatives = groupedSelected.flatMap { it.drop(1) },
-            otherLanguages = verified
-                .filter { it.languageCode != selectedLanguageCode }
-                .distinctBy(FreeBook::editionId)
-                .sortedWith(EDITION_PREFERENCE),
-            other = filterNot { it.editionId in verifiedIds }.distinctBy(FreeBook::editionId),
+            verified = groupedEditions.mapNotNull(List<FreeBook>::firstOrNull),
+            alternatives = groupedEditions.flatMap { it.drop(1) },
+            other = remaining
+                .filterNot { it.workId in verifiedWorkIds }
+                .distinctBy { it.workId.ifBlank { it.catalogTitleKey } },
+            editionCounts = editionCounts(),
         )
     }
 
@@ -503,6 +516,7 @@ class SearchViewModel(
                 alternativeEditionBooks = emptyList(),
                 otherLanguageBooks = emptyList(),
                 otherFreeBooks = emptyList(),
+                editionCountsByWorkId = emptyMap(),
                 errorMessage = null,
                 actionMessage = notice,
                 isFreeCatalogFallback = false,
@@ -524,6 +538,7 @@ class SearchViewModel(
                 alternativeEditionBooks = emptyList(),
                 otherLanguageBooks = emptyList(),
                 otherFreeBooks = emptyList(),
+                editionCountsByWorkId = emptyMap(),
                 errorMessage = message,
                 actionMessage = null,
                 isFreeCatalogFallback = false,
@@ -607,6 +622,7 @@ class SearchViewModel(
         val alternatives: List<FreeBook> = emptyList(),
         val otherLanguages: List<FreeBook> = emptyList(),
         val other: List<FreeBook> = emptyList(),
+        val editionCounts: Map<String, Int> = emptyMap(),
     )
 
     private sealed interface FreeCatalogPageResult {
@@ -623,18 +639,16 @@ class SearchViewModel(
         hasMore: Boolean,
     ): SearchUiState {
         val selectedEditions = (
-            freeBooks + alternativeEditionBooks + page.verified + page.alternatives
+            freeBooks + alternativeEditionBooks + otherLanguageBooks +
+                page.verified + page.alternatives + page.otherLanguages
             )
             .distinctBy(FreeBook::editionId)
-            .groupBy(FreeBook::catalogTitleKey)
+            .groupBy { book -> book.workId.ifBlank { book.catalogTitleKey } }
             .values
-            .map { editions -> editions.sortedWith(EDITION_PREFERENCE) }
+            .map { editions -> editions.sortedWith(editionPreference(bookLanguageCode)) }
         val verified = selectedEditions.mapNotNull(List<FreeBook>::firstOrNull)
         val alternatives = selectedEditions.flatMap { it.drop(1) }
-        val otherLanguages = (otherLanguageBooks + page.otherLanguages)
-            .distinctBy(FreeBook::editionId)
-            .sortedWith(EDITION_PREFERENCE)
-        val verifiedIds = (verified + alternatives + otherLanguages)
+        val verifiedIds = (verified + alternatives)
             .mapTo(mutableSetOf(), FreeBook::editionId)
         val other = (otherFreeBooks + page.other)
             .distinctBy(FreeBook::editionId)
@@ -642,8 +656,15 @@ class SearchViewModel(
         return copy(
             freeBooks = verified,
             alternativeEditionBooks = alternatives,
-            otherLanguageBooks = otherLanguages,
+            otherLanguageBooks = emptyList(),
             otherFreeBooks = other,
+            editionCountsByWorkId = (editionCountsByWorkId.keys + page.editionCounts.keys)
+                .associateWith { workId ->
+                    maxOf(
+                        editionCountsByWorkId[workId].orEmptyCount(),
+                        page.editionCounts[workId].orEmptyCount(),
+                    )
+                },
             isLoadingNextPage = false,
             canLoadMore = hasMore,
             nextPageError = null,
@@ -659,11 +680,20 @@ class SearchViewModel(
         }.getOrDefault("eng")
     }
 
-    private val EDITION_PREFERENCE = compareByDescending<FreeBook> { book ->
-        when (book.textEditionType) {
-            TextEditionType.MODERN_ORTHOGRAPHY -> 3
-            TextEditionType.UNSPECIFIED -> 2
-            TextEditionType.HISTORICAL_ORTHOGRAPHY -> 1
-        }
-    }.thenByDescending { it.coverId != null || !it.coverUrl.isNullOrBlank() }
+    private fun editionPreference(selectedLanguageCode: String) =
+        compareByDescending<FreeBook> { book -> book.languageCode == selectedLanguageCode }
+            .thenByDescending { book ->
+                when (book.textEditionType) {
+                    TextEditionType.MODERN_ORTHOGRAPHY -> 3
+                    TextEditionType.UNSPECIFIED -> 2
+                    TextEditionType.HISTORICAL_ORTHOGRAPHY -> 1
+                }
+            }
+            .thenByDescending { it.coverId != null || !it.coverUrl.isNullOrBlank() }
+
+    private fun List<FreeBook>.editionCounts(): Map<String, Int> = groupBy(FreeBook::workId)
+        .filterKeys(String::isNotBlank)
+        .mapValues { (_, editions) -> editions.distinctBy(FreeBook::editionId).size }
+
+    private fun Int?.orEmptyCount(): Int = this ?: 0
 }

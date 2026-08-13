@@ -26,6 +26,14 @@ internal class FreeBookMetadataMerger(
             } else {
                 val existing = result[existingIndex]
                 val sharedWorkId = sharedWorkId(existing, candidate)
+                val previousWorkId = existing.workId
+                result.indices
+                    .filter { index -> result[index].workId == previousWorkId }
+                    .forEach { index ->
+                        result[index] = result[index]
+                            .withCoverFrom(candidate)
+                            .copy(workId = sharedWorkId)
+                    }
                 val enrichedExisting = existing
                     .withCoverFrom(candidate)
                     .copy(workId = sharedWorkId)

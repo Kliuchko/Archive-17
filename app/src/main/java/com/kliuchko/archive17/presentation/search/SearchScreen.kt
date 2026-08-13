@@ -273,6 +273,7 @@ private fun SearchResults(
                     ) { book ->
                         FreeBookResultCard(
                             book = book,
+                            editionCount = uiState.editionCount(book),
                             canDownload = true,
                             isDownloading = uiState.downloadingBookId == book.editionId,
                             isPreparingToRead = uiState.readingBookId == book.editionId,
@@ -282,54 +283,6 @@ private fun SearchResults(
                             onRead = { onReadNow(book) },
                             onDownload = { onDownloadBook(book) },
                         )
-                    }
-                    if (uiState.alternativeEditionBooks.isNotEmpty()) {
-                        item(key = "alternative-editions-heading") {
-                            EditionSectionHeading(
-                                title = stringResource(R.string.alternative_editions),
-                                body = stringResource(R.string.alternative_editions_body),
-                            )
-                        }
-                        items(
-                            items = uiState.alternativeEditionBooks,
-                            key = { "alternative-${it.editionId}" },
-                        ) { book ->
-                            FreeBookResultCard(
-                                book = book,
-                                canDownload = true,
-                                isDownloading = uiState.downloadingBookId == book.editionId,
-                                isPreparingToRead = uiState.readingBookId == book.editionId,
-                                actionsEnabled = uiState.downloadingBookId == null &&
-                                    uiState.readingBookId == null,
-                                onOpen = { onFreeBookClick(book.editionId) },
-                                onRead = { onReadNow(book) },
-                                onDownload = { onDownloadBook(book) },
-                            )
-                        }
-                    }
-                    if (uiState.otherLanguageBooks.isNotEmpty()) {
-                        item(key = "other-languages-heading") {
-                            EditionSectionHeading(
-                                title = stringResource(R.string.other_language_editions),
-                                body = stringResource(R.string.other_language_editions_body),
-                            )
-                        }
-                        items(
-                            items = uiState.otherLanguageBooks,
-                            key = { "language-${it.editionId}" },
-                        ) { book ->
-                            FreeBookResultCard(
-                                book = book,
-                                canDownload = true,
-                                isDownloading = uiState.downloadingBookId == book.editionId,
-                                isPreparingToRead = uiState.readingBookId == book.editionId,
-                                actionsEnabled = uiState.downloadingBookId == null &&
-                                    uiState.readingBookId == null,
-                                onOpen = { onFreeBookClick(book.editionId) },
-                                onRead = { onReadNow(book) },
-                                onDownload = { onDownloadBook(book) },
-                            )
-                        }
                     }
                     if (uiState.otherFreeBooks.isNotEmpty()) {
                         item(key = "other-open-editions-heading") {
@@ -354,6 +307,7 @@ private fun SearchResults(
                         ) { book ->
                             FreeBookResultCard(
                                 book = book,
+                                editionCount = uiState.editionCount(book),
                                 canDownload = false,
                                 isDownloading = false,
                                 isPreparingToRead = false,
@@ -446,21 +400,6 @@ private fun SearchResults(
 }
 
 @Composable
-private fun EditionSectionHeading(title: String, body: String) {
-    Column(
-        modifier = Modifier.padding(top = 10.dp, bottom = 2.dp),
-        verticalArrangement = Arrangement.spacedBy(4.dp),
-    ) {
-        Text(text = title, style = MaterialTheme.typography.titleMedium)
-        Text(
-            text = body,
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-    }
-}
-
-@Composable
 private fun LoadNextPageEffect(
     listState: LazyListState,
     enabled: Boolean,
@@ -527,6 +466,7 @@ private fun CatalogPaginationFooter(
 @Composable
 private fun FreeBookResultCard(
     book: FreeBook,
+    editionCount: Int,
     canDownload: Boolean,
     isDownloading: Boolean,
     isPreparingToRead: Boolean,
@@ -566,6 +506,17 @@ private fun FreeBookResultCard(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
+                if (editionCount > 1) {
+                    Text(
+                        text = androidx.compose.ui.res.pluralStringResource(
+                            R.plurals.available_edition_count,
+                            editionCount,
+                            editionCount,
+                        ),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                }
                 Text(
                     text = "${stringResource(
                         if (canDownload) R.string.public_access else R.string.open_edition,

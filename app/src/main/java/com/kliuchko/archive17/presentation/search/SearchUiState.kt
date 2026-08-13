@@ -21,6 +21,7 @@ data class SearchUiState(
     val alternativeEditionBooks: List<FreeBook> = emptyList(),
     val otherLanguageBooks: List<FreeBook> = emptyList(),
     val otherFreeBooks: List<FreeBook> = emptyList(),
+    val editionCountsByWorkId: Map<String, Int> = emptyMap(),
     val selectedMode: CatalogMode = CatalogMode.FREE,
     val bookLanguageCode: String = "eng",
     val downloadingBookId: String? = null,
@@ -48,4 +49,8 @@ data class SearchUiState(
     companion object {
         const val MIN_QUERY_LENGTH = 2
     }
+
+    fun editionCount(book: FreeBook): Int = editionCountsByWorkId[book.workId]
+        ?.coerceAtLeast(1)
+        ?: 1
 }

@@ -341,6 +341,13 @@ private fun RelatedEditionCard(
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.primary,
             )
+            access?.providerName?.let { provider ->
+                Text(
+                    text = provider,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         }
     }
 }

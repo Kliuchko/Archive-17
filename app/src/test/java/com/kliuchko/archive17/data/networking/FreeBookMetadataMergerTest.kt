@@ -133,6 +133,36 @@ class FreeBookMetadataMergerTest {
         assertEquals(77, result.single { it.editionId == "wikisource-quixote" }.coverId)
     }
 
+    @Test
+    fun `all source editions inherit the canonical work id discovered later`() = runBlocking {
+        val firstTranslation = book(
+            editionId = "wikisource-1841",
+            title = "Оливер Твист",
+            author = "Чарльз Диккенс",
+            source = FreeBookSource.WIKISOURCE,
+            downloadUrl = "https://ws-export.wmcloud.org/1841.epub",
+        )
+        val secondTranslation = book(
+            editionId = "wikisource-1909",
+            title = "Оливер Твист",
+            author = "Чарльз Диккенс",
+            source = FreeBookSource.WIKISOURCE,
+            downloadUrl = "https://ws-export.wmcloud.org/1909.epub",
+        )
+        val canonicalWork = book(
+            editionId = "openlibrary-oliver",
+            title = "Оливер Твист",
+            author = "Charles Dickens",
+            source = FreeBookSource.OPEN_LIBRARY,
+            coverId = 9280636,
+        )
+
+        val result = merger.merge(listOf(firstTranslation, secondTranslation, canonicalWork))
+
+        assertEquals(3, result.size)
+        assertTrue(result.all { it.workId == "openlibrary-oliver" })
+    }
+
     private fun book(
         editionId: String,
         title: String,
