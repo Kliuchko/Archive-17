@@ -191,6 +191,8 @@
     <string name="modern_orthography">Современная орфография</string>
     <string name="edition_type_label">Версия текста</string>
     <string name="edition_details_label">Издание</string>
+    <string name="available_editions">Доступные издания</string>
+    <string name="available_editions_body">Переводы, оригиналы и другие версии этого произведения.</string>
     <string name="access_label">Доступ</string>
     <string name="rights_basis_label">Основание доступа</string>
     <string name="rights_open_license">Открытая лицензия источника</string>

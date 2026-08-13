@@ -1,5 +1,6 @@
 package com.kliuchko.archive17.presentation.freedetails
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -10,6 +11,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -27,6 +30,8 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.kliuchko.archive17.R
 import com.kliuchko.archive17.domain.model.FreeAccessBasis
+import com.kliuchko.archive17.domain.model.EditionAvailability
+import com.kliuchko.archive17.domain.model.PublicationEdition
 import com.kliuchko.archive17.domain.model.TextEditionType
 import com.kliuchko.archive17.domain.model.TemporaryBook
 import com.kliuchko.archive17.presentation.components.FreeBookCover
@@ -39,6 +44,7 @@ fun FreeBookDetailsScreen(
     onBackClick: () -> Unit,
     onBookReady: (String) -> Unit,
     onTemporaryBookReady: (TemporaryBook) -> Unit,
+    onEditionClick: (String) -> Unit,
     modifier: Modifier = Modifier,
     viewModel: FreeBookDetailsViewModel = koinViewModel(parameters = { parametersOf(editionId) }),
 ) {
@@ -139,6 +145,27 @@ fun FreeBookDetailsScreen(
                     label = stringResource(R.string.edition_language_label),
                     value = localizedBookLanguage(book.languageCode),
                 )
+
+                val otherEditions = details.relatedEditions.filterNot { edition ->
+                    edition.id == book.editionId
+                }
+                if (otherEditions.isNotEmpty()) {
+                    Text(
+                        text = stringResource(R.string.available_editions),
+                        style = MaterialTheme.typography.titleLarge,
+                    )
+                    Text(
+                        text = stringResource(R.string.available_editions_body),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    otherEditions.forEach { edition ->
+                        RelatedEditionCard(
+                            edition = edition,
+                            onClick = { onEditionClick(edition.id) },
+                        )
+                    }
+                }
                 if (book.textEditionType != TextEditionType.UNSPECIFIED) {
                     DetailFact(
                         label = stringResource(R.string.edition_type_label),
@@ -271,6 +298,49 @@ fun FreeBookDetailsScreen(
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun RelatedEditionCard(
+    edition: PublicationEdition,
+    onClick: () -> Unit,
+) {
+    val access = edition.accessOptions.firstOrNull()
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+    ) {
+        Column(
+            modifier = Modifier.padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            Text(text = edition.title, style = MaterialTheme.typography.titleMedium)
+            Text(
+                text = listOfNotNull(
+                    localizedBookLanguage(edition.languageCode),
+                    edition.textEditionType.takeIf {
+                        it == TextEditionType.HISTORICAL_ORTHOGRAPHY
+                    }?.let { stringResource(R.string.historical_orthography_warning) },
+                    edition.label,
+                ).joinToString(" · "),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Text(
+                text = stringResource(
+                    if (access?.availability == EditionAvailability.AVAILABLE) {
+                        R.string.public_access
+                    } else {
+                        R.string.open_edition
+                    },
+                ),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.primary,
+            )
         }
     }
 }

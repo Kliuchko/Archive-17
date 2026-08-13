@@ -136,6 +136,11 @@ fun Archive17App(
                     onTemporaryBookReady = { book ->
                         context.startActivity(EpubReaderActivity.createTemporaryIntent(context, book))
                     },
+                    onEditionClick = { relatedEditionId ->
+                        navController.navigate(
+                            Archive17Destination.FreeDetails.createRoute(relatedEditionId),
+                        )
+                    },
                 )
             }
 

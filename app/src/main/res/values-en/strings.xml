@@ -191,6 +191,8 @@
     <string name="modern_orthography">Modern orthography</string>
     <string name="edition_type_label">Text version</string>
     <string name="edition_details_label">Edition</string>
+    <string name="available_editions">Available editions</string>
+    <string name="available_editions_body">Translations, originals, and other versions of this work.</string>
     <string name="access_label">Access</string>
     <string name="rights_basis_label">Access basis</string>
     <string name="rights_open_license">Open source license</string>

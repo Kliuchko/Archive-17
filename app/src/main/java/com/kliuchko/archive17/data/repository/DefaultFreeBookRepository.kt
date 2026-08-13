@@ -20,8 +20,11 @@ import com.kliuchko.archive17.domain.model.FreeBook
 import com.kliuchko.archive17.domain.model.FreeBookDetails
 import com.kliuchko.archive17.domain.model.FreeBookSource
 import com.kliuchko.archive17.domain.model.LocalBook
+import com.kliuchko.archive17.domain.model.PublicationEdition
 import com.kliuchko.archive17.domain.model.TemporaryBook
+import com.kliuchko.archive17.domain.model.TextEditionType
 import com.kliuchko.archive17.domain.model.Work
+import com.kliuchko.archive17.domain.model.toPublicationEdition
 import com.kliuchko.archive17.domain.repository.FreeBookRepository
 import com.kliuchko.archive17.domain.repository.BookQueryResolver
 import com.kliuchko.archive17.domain.repository.LocalBookRepository
@@ -181,27 +184,48 @@ class DefaultFreeBookRepository(
         val book = booksByEditionId[editionId]
             ?: return RepositoryResult.Error("Откройте книгу ещё раз из Каталога.")
 
+        val relatedEditions = booksByEditionId.values
+            .asSequence()
+            .filter { candidate -> candidate.workId == book.workId }
+            .distinctBy(FreeBook::editionId)
+            .map(FreeBook::toPublicationEdition)
+            .sortedWith(PUBLICATION_EDITION_PREFERENCE)
+            .toList()
+
         if (book.source == FreeBookSource.WIKISOURCE) {
             return RepositoryResult.Success(
                 FreeBookDetails(
                     book = book,
                     description = null,
                     subjects = emptyList(),
+                    relatedEditions = relatedEditions,
                 ),
             )
         }
         if (book.source == FreeBookSource.STANDARD_EBOOKS) {
             return standardEbookDetails(book)
+                ?.copy(relatedEditions = relatedEditions)
                 ?.let { RepositoryResult.Success(it) }
                 ?: RepositoryResult.Success(
-                    FreeBookDetails(book = book, description = null, subjects = emptyList()),
+                    FreeBookDetails(
+                        book = book,
+                        description = null,
+                        subjects = emptyList(),
+                        relatedEditions = relatedEditions,
+                    ),
                 )
         }
         if (book.source == FreeBookSource.AUTHORIZED_PUBLISHER) {
             return authorizedPublisherDetails(book)
+                ?.copy(relatedEditions = relatedEditions)
                 ?.let { RepositoryResult.Success(it) }
                 ?: RepositoryResult.Success(
-                    FreeBookDetails(book = book, description = null, subjects = emptyList()),
+                    FreeBookDetails(
+                        book = book,
+                        description = null,
+                        subjects = emptyList(),
+                        relatedEditions = relatedEditions,
+                    ),
                 )
         }
 
@@ -225,6 +249,7 @@ class DefaultFreeBookRepository(
                     book = book,
                     description = work.description,
                     subjects = work.subjects.take(MAX_DETAIL_SUBJECTS),
+                    relatedEditions = relatedEditions,
                 ),
             )
         } catch (exception: Throwable) {
@@ -234,6 +259,7 @@ class DefaultFreeBookRepository(
                     book = book,
                     description = null,
                     subjects = emptyList(),
+                    relatedEditions = relatedEditions,
                 ),
                 message = "Подробное описание пока не загрузилось.",
             )
@@ -583,6 +609,13 @@ class DefaultFreeBookRepository(
         const val STANDARD_EBOOKS_HOST = "standardebooks.org"
         val ISO_639_2_PATTERN = Regex("[a-z]{3}")
         val ARCHIVE_IDENTIFIER_PATTERN = Regex("[A-Za-z0-9._-]+")
+        val PUBLICATION_EDITION_PREFERENCE = compareByDescending<PublicationEdition> { edition ->
+                when (edition.textEditionType) {
+                    TextEditionType.MODERN_ORTHOGRAPHY -> 3
+                    TextEditionType.UNSPECIFIED -> 2
+                    TextEditionType.HISTORICAL_ORTHOGRAPHY -> 1
+                }
+            }.thenByDescending { edition -> edition.languageCode == RUSSIAN_LANGUAGE }
     }
 }
 

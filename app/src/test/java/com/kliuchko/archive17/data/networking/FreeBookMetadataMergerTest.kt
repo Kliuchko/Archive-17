@@ -41,6 +41,7 @@ class FreeBookMetadataMergerTest {
         assertEquals(2, result.size)
         val readableResult = result.single { it.editionId == "wikisource-war" }
         assertEquals(12621906, readableResult.coverId)
+        assertEquals("openlibrary-war", readableResult.workId)
         assertTrue(readableResult.isDownloadable)
     }
 

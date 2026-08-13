@@ -96,6 +96,7 @@ data class FreeBookDetails(
     val book: FreeBook,
     val description: String?,
     val subjects: List<String>,
+    val relatedEditions: List<PublicationEdition> = emptyList(),
 )
 
 data class TemporaryBook(

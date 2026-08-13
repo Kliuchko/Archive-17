@@ -25,8 +25,13 @@ internal class FreeBookMetadataMerger(
                 result += candidate
             } else {
                 val existing = result[existingIndex]
-                val enrichedExisting = existing.withCoverFrom(candidate)
-                val enrichedCandidate = candidate.withCoverFrom(existing)
+                val sharedWorkId = sharedWorkId(existing, candidate)
+                val enrichedExisting = existing
+                    .withCoverFrom(candidate)
+                    .copy(workId = sharedWorkId)
+                val enrichedCandidate = candidate
+                    .withCoverFrom(existing)
+                    .copy(workId = sharedWorkId)
                 result[existingIndex] = enrichedExisting
                 if (candidate.editionId != existing.editionId) {
                     result += enrichedCandidate
@@ -105,6 +110,12 @@ internal class FreeBookMetadataMerger(
         coverId = coverId ?: other.coverId,
         coverUrl = coverUrl ?: other.coverUrl,
     )
+
+    private fun sharedWorkId(left: FreeBook, right: FreeBook): String = when {
+        left.source == FreeBookSource.OPEN_LIBRARY -> left.workId
+        right.source == FreeBookSource.OPEN_LIBRARY -> right.workId
+        else -> left.workId
+    }
 
     private suspend fun resolvedValues(value: String, languageCode: String): List<String> =
         queryResolver.resolve(value, languageCode).ifEmpty { listOf(value) }
