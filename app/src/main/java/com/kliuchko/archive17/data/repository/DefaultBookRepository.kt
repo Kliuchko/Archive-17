@@ -6,16 +6,20 @@ import com.kliuchko.archive17.data.local.dao.WorkDao
 import com.kliuchko.archive17.data.local.mapper.toDomain
 import com.kliuchko.archive17.data.local.mapper.toEntity
 import com.kliuchko.archive17.data.networking.api.OpenLibraryApi
+import com.kliuchko.archive17.data.networking.CoverMatchEnricher
 import com.kliuchko.archive17.data.networking.mapper.toDomain
-import com.kliuchko.archive17.data.networking.mapper.withCatalogQueryAlias
 import com.kliuchko.archive17.domain.model.LibraryBook
 import com.kliuchko.archive17.domain.model.LibraryEntry
 import com.kliuchko.archive17.domain.model.ReadingStatus
 import com.kliuchko.archive17.domain.model.Work
 import com.kliuchko.archive17.domain.model.WorkDetails
 import com.kliuchko.archive17.domain.repository.BookRepository
+import com.kliuchko.archive17.domain.repository.BookQueryResolver
 import com.kliuchko.archive17.domain.repository.RepositoryResult
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
@@ -25,8 +29,11 @@ class DefaultBookRepository(
     private val workDao: WorkDao,
     private val libraryEntryDao: LibraryEntryDao,
     private val timeProvider: TimeProvider,
+    private val queryResolver: BookQueryResolver,
     private val cacheFreshnessMillis: Long = DEFAULT_CACHE_FRESHNESS_MILLIS,
 ) : BookRepository {
+    private val coverMatchEnricher = CoverMatchEnricher()
+
     override suspend fun searchBooks(query: String, page: Int): RepositoryResult<List<Work>> {
         val normalizedQuery = query.trim()
         if (normalizedQuery.length < MIN_SEARCH_QUERY_LENGTH) {
@@ -37,11 +44,32 @@ class DefaultBookRepository(
             errorMessage = "Unable to search books.",
         ) {
             val now = timeProvider.currentTimeMillis()
-            val works = api.searchBooks(
-                normalizedQuery.withCatalogQueryAlias(),
-                page = page.coerceAtLeast(1),
+            val resolvedQueries = queryResolver.resolve(normalizedQuery)
+                .ifEmpty { listOf(normalizedQuery) }
+                .take(MAX_SOURCE_QUERIES)
+            val responses = coroutineScope {
+                resolvedQueries.map { resolvedQuery ->
+                    async {
+                        try {
+                            api.searchBooks(
+                                query = resolvedQuery,
+                                page = page.coerceAtLeast(1),
+                            )
+                        } catch (exception: Throwable) {
+                            if (exception is CancellationException) throw exception
+                            null
+                        }
+                    }
+                }.awaitAll()
+            }
+            if (responses.all { it == null }) {
+                error("All catalog searches failed")
+            }
+            val works = coverMatchEnricher.enrichWorks(
+                responses.filterNotNull()
+                    .flatMap { it.toDomain() },
             )
-                .toDomain()
+                .distinctBy(Work::id)
                 .map { it.copy(lastUpdatedAt = now) }
 
             workDao.upsertWorks(works.map { it.toEntity(now) })
@@ -154,6 +182,7 @@ class DefaultBookRepository(
 
     companion object {
         const val MIN_SEARCH_QUERY_LENGTH = 2
+        const val MAX_SOURCE_QUERIES = 3
         const val DEFAULT_CACHE_FRESHNESS_MILLIS = 24L * 60L * 60L * 1000L
     }
 }

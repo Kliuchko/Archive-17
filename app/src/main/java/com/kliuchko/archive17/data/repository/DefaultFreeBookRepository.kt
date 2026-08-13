@@ -1,6 +1,7 @@
 package com.kliuchko.archive17.data.repository
 
 import android.content.Context
+import com.kliuchko.archive17.data.networking.CoverMatchEnricher
 import com.kliuchko.archive17.data.networking.api.InternetArchiveApi
 import com.kliuchko.archive17.data.networking.api.OpenLibraryApi
 import com.kliuchko.archive17.data.networking.api.WikisourceApi
@@ -21,6 +22,7 @@ import com.kliuchko.archive17.domain.model.LocalBook
 import com.kliuchko.archive17.domain.model.TemporaryBook
 import com.kliuchko.archive17.domain.model.Work
 import com.kliuchko.archive17.domain.repository.FreeBookRepository
+import com.kliuchko.archive17.domain.repository.BookQueryResolver
 import com.kliuchko.archive17.domain.repository.LocalBookRepository
 import com.kliuchko.archive17.domain.repository.RepositoryResult
 import java.io.File
@@ -45,6 +47,7 @@ class DefaultFreeBookRepository(
     private val wikisourceApi: WikisourceApi,
     private val client: OkHttpClient,
     private val localBookRepository: LocalBookRepository,
+    private val queryResolver: BookQueryResolver,
 ) : FreeBookRepository {
     private val downloadDirectory = File(context.applicationContext.cacheDir, "free-book-downloads")
     private val temporaryReadingDirectory = File(
@@ -53,6 +56,7 @@ class DefaultFreeBookRepository(
     )
     private val booksByEditionId = ConcurrentHashMap<String, FreeBook>()
     private val catalogCache = FreeBookCatalogCache(context)
+    private val coverMatchEnricher = CoverMatchEnricher()
 
     override suspend fun searchBooks(
         query: String,
@@ -79,19 +83,24 @@ class DefaultFreeBookRepository(
                 if (remoteError != null) {
                     return RepositoryResult.Error("Не удалось загрузить следующую страницу книг.")
                 }
-                catalogCache.write(languageCode, page, remoteBooks, System.currentTimeMillis())
-                remoteBooks.forEach { book -> booksByEditionId[book.editionId] = book }
-                return RepositoryResult.Success(remoteBooks)
+                val books = coverMatchEnricher.enrichFreeBooks(remoteBooks)
+                catalogCache.write(languageCode, page, books, System.currentTimeMillis())
+                books.forEach { book -> booksByEditionId[book.editionId] = book }
+                return RepositoryResult.Success(books)
             }
-            val books = interleaveBooks(primarySourceBooks, cachedBooks)
-                .distinctBy(FreeBook::catalogTitleKey)
+            val books = combineCatalogBooks(primarySourceBooks, cachedBooks)
             books.forEach { book -> booksByEditionId[book.editionId] = book }
             return RepositoryResult.Success(books)
         }
 
+        val resolvedQueries = queryResolver.resolve(normalizedQuery, languageCode)
+            .ifEmpty { listOf(normalizedQuery) }
+            .take(MAX_SOURCE_QUERIES)
         val (openLibraryResult, primarySourceResult) = coroutineScope {
             val openLibrary = async {
-                fetchBooksSafely { fetchOpenLibraryBooks(normalizedQuery, languageCode, page) }
+                fetchBooksSafely {
+                    fetchOpenLibraryBooks(resolvedQueries, languageCode, page)
+                }
             }
             val primarySource = async {
                 fetchBooksSafely { searchPrimarySourceBooks(normalizedQuery, languageCode, page) }
@@ -104,8 +113,7 @@ class DefaultFreeBookRepository(
         return if (openLibraryError != null && primarySourceError != null) {
             RepositoryResult.Error("Не удалось найти бесплатные книги.")
         } else {
-            val books = interleaveBooks(primarySourceBooks, openLibraryBooks)
-                .distinctBy(FreeBook::catalogTitleKey)
+            val books = combineCatalogBooks(primarySourceBooks, openLibraryBooks)
             books.forEach { book -> booksByEditionId[book.editionId] = book }
             RepositoryResult.Success(books)
         }
@@ -127,14 +135,14 @@ class DefaultFreeBookRepository(
             cached.isNotEmpty() &&
             !catalogCache.shouldRefresh(languageCode, safePage, System.currentTimeMillis())
         ) {
-            val books = interleaveBooks(primary, cached).distinctBy(FreeBook::catalogTitleKey)
+            val books = combineCatalogBooks(primary, cached)
             books.forEach { book -> booksByEditionId[book.editionId] = book }
             return RepositoryResult.Success(books)
         }
         return try {
             val remote = fetchOpenLibraryBooks("", languageCode, safePage)
             catalogCache.write(languageCode, safePage, remote, System.currentTimeMillis())
-            val books = interleaveBooks(primary, remote).distinctBy(FreeBook::catalogTitleKey)
+            val books = combineCatalogBooks(primary, remote)
             books.forEach { book -> booksByEditionId[book.editionId] = book }
             RepositoryResult.Success(books)
         } catch (exception: Throwable) {
@@ -440,6 +448,22 @@ class DefaultFreeBookRepository(
         ).toFreeBooks(expectedLanguageCode = languageCode)
     }
 
+    private suspend fun fetchOpenLibraryBooks(
+        queries: List<String>,
+        languageCode: String,
+        page: Int,
+    ): List<FreeBook> = coroutineScope {
+        val results = queries.map { query ->
+            async { fetchBooksSafely { fetchOpenLibraryBooks(query, languageCode, page) } }
+        }.awaitAll()
+        if (results.all { (_, error) -> error != null }) {
+            throw results.firstNotNullOf { (_, error) -> error }
+        }
+        coverMatchEnricher
+            .enrichFreeBooks(results.flatMap { (books, _) -> books })
+            .distinctBy(FreeBook::editionId)
+    }
+
     private suspend fun searchWikisourceBooks(
         query: String,
         page: Int,
@@ -487,6 +511,13 @@ class DefaultFreeBookRepository(
         }
     }
 
+    private fun combineCatalogBooks(
+        primary: List<FreeBook>,
+        secondary: List<FreeBook>,
+    ): List<FreeBook> = coverMatchEnricher
+        .enrichFreeBooks(interleaveBooks(primary, secondary))
+        .distinctBy(FreeBook::catalogTitleKey)
+
     private fun String.toIso6391(): String = when (this) {
         "rus" -> "ru"
         "eng" -> "en"
@@ -519,6 +550,7 @@ class DefaultFreeBookRepository(
 
     private companion object {
         const val MIN_SEARCH_QUERY_LENGTH = 2
+        const val MAX_SOURCE_QUERIES = 3
         const val MAX_EPUB_BYTES = 50L * 1024L * 1024L
         const val MAX_TEMPORARY_BOOKS = 4
         const val TEMPORARY_READING_DIRECTORY = "temporary-reading"

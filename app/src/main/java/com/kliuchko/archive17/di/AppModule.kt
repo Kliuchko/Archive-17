@@ -8,12 +8,15 @@ import com.kliuchko.archive17.data.local.Archive17Database
 import com.kliuchko.archive17.data.networking.api.OpenLibraryApi
 import com.kliuchko.archive17.data.networking.api.InternetArchiveApi
 import com.kliuchko.archive17.data.networking.api.WikisourceApi
+import com.kliuchko.archive17.data.networking.api.WikidataApi
 import com.kliuchko.archive17.data.repository.DefaultBookRepository
 import com.kliuchko.archive17.data.repository.DefaultFreeBookRepository
+import com.kliuchko.archive17.data.repository.WikidataBookQueryResolver
 import com.kliuchko.archive17.data.reader.ReadiumService
 import com.kliuchko.archive17.data.repository.DefaultLocalBookRepository
 import com.kliuchko.archive17.data.repository.DefaultLanguageSettingsRepository
 import com.kliuchko.archive17.domain.repository.BookRepository
+import com.kliuchko.archive17.domain.repository.BookQueryResolver
 import com.kliuchko.archive17.domain.repository.FreeBookRepository
 import com.kliuchko.archive17.domain.repository.LocalBookRepository
 import com.kliuchko.archive17.domain.repository.LanguageSettingsRepository
@@ -106,12 +109,29 @@ val appModule = module {
             .create(WikisourceApi::class.java)
     }
 
+    single<WikidataApi> {
+        Retrofit.Builder()
+            .baseUrl(WikidataApi.BASE_URL)
+            .client(get())
+            .addConverterFactory(GsonConverterFactory.create())
+            .build()
+            .create(WikidataApi::class.java)
+    }
+
+    single<BookQueryResolver> {
+        WikidataBookQueryResolver(
+            context = androidContext(),
+            api = get(),
+        )
+    }
+
     single<BookRepository> {
         DefaultBookRepository(
             api = get(),
             workDao = get(),
             libraryEntryDao = get(),
             timeProvider = get(),
+            queryResolver = get(),
         )
     }
 
@@ -136,6 +156,7 @@ val appModule = module {
             wikisourceApi = get(),
             client = get(),
             localBookRepository = get(),
+            queryResolver = get(),
         )
     }
 

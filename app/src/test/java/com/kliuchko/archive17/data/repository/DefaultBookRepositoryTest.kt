@@ -17,6 +17,7 @@ import com.kliuchko.archive17.data.networking.dto.OpenLibraryWorkDto
 import com.kliuchko.archive17.domain.model.ReadingStatus
 import com.kliuchko.archive17.domain.model.Work
 import com.kliuchko.archive17.domain.repository.RepositoryResult
+import com.kliuchko.archive17.domain.repository.BookQueryResolver
 import java.io.IOException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -33,11 +34,13 @@ class DefaultBookRepositoryTest {
     private val workDao = FakeWorkDao()
     private val libraryEntryDao = FakeLibraryEntryDao(workDao)
     private val timeProvider = MutableTimeProvider(currentTimeMillis = 1_000L)
+    private val queryResolver = FakeBookQueryResolver()
     private val repository = DefaultBookRepository(
         api = api,
         workDao = workDao,
         libraryEntryDao = libraryEntryDao,
         timeProvider = timeProvider,
+        queryResolver = queryResolver,
     )
 
     @Test
@@ -80,10 +83,27 @@ class DefaultBookRepositoryTest {
     }
 
     @Test
-    fun `search uses source title for Russian Stainless Steel Rat query`() = runBlocking {
-        repository.searchBooks("Стальная Крыса")
+    fun `search uses general resolved title variants and removes duplicate works`() = runBlocking {
+        queryResolver.resolvedQueries = listOf("Стальная Крыса", "The Stainless Steel Rat")
+        api.searchResponse = OpenLibrarySearchResponseDto(
+            docs = listOf(
+                OpenLibrarySearchDocDto(
+                    key = "/works/OL467284W",
+                    title = "The Stainless Steel Rat",
+                    authorNames = listOf("Harry Harrison"),
+                    coverId = null,
+                    firstPublishYear = 1961,
+                    editionCount = 1,
+                    languages = listOf("eng"),
+                ),
+            ),
+        )
 
-        assertEquals("The Stainless Steel Rat", api.lastSearchQuery)
+        val result = repository.searchBooks("Стальная Крыса")
+
+        require(result is RepositoryResult.Success)
+        assertEquals(listOf("Стальная Крыса", "The Stainless Steel Rat"), api.searchQueries)
+        assertEquals(1, result.data.size)
     }
 
     @Test
@@ -205,6 +225,13 @@ private class MutableTimeProvider(
     override fun currentTimeMillis(): Long = currentTimeMillis
 }
 
+private class FakeBookQueryResolver : BookQueryResolver {
+    var resolvedQueries: List<String>? = null
+
+    override suspend fun resolve(query: String, preferredLanguageCode: String?): List<String> =
+        resolvedQueries ?: listOf(query)
+}
+
 private class FakeOpenLibraryApi : OpenLibraryApi {
     var searchResponse = OpenLibrarySearchResponseDto()
     var workResponse = OpenLibraryWorkDto(
@@ -218,6 +245,7 @@ private class FakeOpenLibraryApi : OpenLibraryApi {
     var searchCallCount = 0
     var lastSearchPage = 1
     var lastSearchQuery = ""
+    val searchQueries = mutableListOf<String>()
 
     override suspend fun searchBooks(
         query: String,
@@ -227,6 +255,7 @@ private class FakeOpenLibraryApi : OpenLibraryApi {
     ): OpenLibrarySearchResponseDto {
         searchCallCount += 1
         lastSearchQuery = query
+        searchQueries += query
         lastSearchPage = page
         searchError?.let { throw it }
         return searchResponse

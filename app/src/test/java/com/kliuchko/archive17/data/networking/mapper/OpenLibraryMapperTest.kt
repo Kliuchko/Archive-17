@@ -50,6 +50,39 @@ class OpenLibraryMapperTest {
     }
 
     @Test
+    fun `uses selected edition cover when work cover is missing`() {
+        val response = OpenLibrarySearchResponseDto(
+            docs = listOf(
+                OpenLibrarySearchDocDto(
+                    key = "/works/OL1W",
+                    title = "Work title",
+                    authorNames = listOf("Author"),
+                    coverId = null,
+                    firstPublishYear = 1900,
+                    editionCount = 1,
+                    languages = listOf("eng"),
+                    editions = OpenLibraryEditionsDto(
+                        docs = listOf(
+                            OpenLibraryEditionSearchDto(
+                                key = "/books/OL1M",
+                                title = "Edition title",
+                                languages = listOf("eng"),
+                                ebookAccess = "public",
+                                archiveIdentifiers = listOf("archive-id"),
+                                coverId = 77,
+                                isbns = listOf("9780000000000"),
+                            ),
+                        ),
+                    ),
+                ),
+            ),
+        )
+
+        assertEquals(77, response.toFreeBooks().single().coverId)
+        assertEquals(77, response.toDomain().single().coverId)
+    }
+
+    @Test
     fun `uses cyrillic work title when russian edition title is romanized`() {
         assertEquals(
             "Идиот",

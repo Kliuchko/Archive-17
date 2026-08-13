@@ -1,6 +1,7 @@
 package com.kliuchko.archive17.data.networking.mapper
 
 import com.google.gson.JsonElement
+import com.kliuchko.archive17.data.networking.dto.OpenLibraryEditionSearchDto
 import com.kliuchko.archive17.data.networking.dto.OpenLibrarySearchDocDto
 import com.kliuchko.archive17.data.networking.dto.OpenLibrarySearchResponseDto
 import com.kliuchko.archive17.data.networking.dto.OpenLibraryWorkDto
@@ -45,7 +46,7 @@ fun OpenLibrarySearchResponseDto.toFreeBooks(expectedLanguageCode: String? = nul
             editionId = editionId,
             title = title,
             authors = document.authorNames.normalizeList(),
-            coverId = document.coverId,
+            coverId = document.preferredCoverId(edition),
             firstPublishYear = document.firstPublishYear,
             languageCode = languageCode,
             archiveIdentifier = archiveIdentifier,
@@ -60,7 +61,7 @@ fun OpenLibrarySearchDocDto.toDomain(lastUpdatedAt: Long? = null): Work? {
         id = workId,
         title = normalizedTitle,
         authors = authorNames.normalizeList(),
-        coverId = coverId,
+        coverId = preferredCoverId(),
         firstPublishYear = firstPublishYear,
         editionCount = editionCount,
         editionLanguages = languages.normalizeList(),
@@ -69,6 +70,12 @@ fun OpenLibrarySearchDocDto.toDomain(lastUpdatedAt: Long? = null): Work? {
         lastUpdatedAt = lastUpdatedAt,
     )
 }
+
+private fun OpenLibrarySearchDocDto.preferredCoverId(
+    selectedEdition: OpenLibraryEditionSearchDto? = null,
+): Int? = coverId
+    ?: selectedEdition?.coverId
+    ?: editions?.docs.orEmpty().firstNotNullOfOrNull { it.coverId }
 
 fun OpenLibraryWorkDto.toDomain(
     fallback: Work? = null,

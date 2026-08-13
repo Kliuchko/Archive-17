@@ -44,4 +44,8 @@ data class OpenLibraryEditionSearchDto(
     val ebookAccess: String? = null,
     @SerializedName("ia")
     val archiveIdentifiers: List<String>? = null,
+    @SerializedName("cover_i")
+    val coverId: Int? = null,
+    @SerializedName("isbn")
+    val isbns: List<String>? = null,
 )
