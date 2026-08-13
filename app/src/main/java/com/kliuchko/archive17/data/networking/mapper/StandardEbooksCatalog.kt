@@ -45,6 +45,7 @@ private fun StandardEbook.toFreeBook(): FreeBook {
         coverUrl = "$pageUrl/downloads/cover.jpg",
         firstPublishYear = year,
         languageCode = ENGLISH_LANGUAGE,
+        publisher = "Standard Ebooks",
         source = FreeBookSource.STANDARD_EBOOKS,
         sourcePageUrl = pageUrl,
         epubDownloadUrl = "$pageUrl/downloads/$fileSlug.epub?source=download",

@@ -32,6 +32,9 @@ class OpenLibraryMapperTest {
                                 languages = listOf("eng"),
                                 ebookAccess = "public",
                                 archiveIdentifiers = listOf("archive-id"),
+                                publishDate = "London, 1909",
+                                publishers = listOf("Example Press"),
+                                contributors = listOf("Jane Smith (Translator)"),
                             ),
                         ),
                     ),
@@ -47,6 +50,9 @@ class OpenLibraryMapperTest {
         assertEquals("Edition title", result.first().title)
         assertEquals("archive-id", result.first().archiveIdentifier)
         assertEquals(1900, result.first().firstPublishYear)
+        assertEquals(1909, result.first().editionYear)
+        assertEquals("Example Press", result.first().publisher)
+        assertEquals("Jane Smith", result.first().translator)
     }
 
     @Test

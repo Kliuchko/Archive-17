@@ -87,6 +87,8 @@ class WikisourceMapperTest {
         assertEquals("Оливер Твист", book.title)
         assertEquals(listOf("Чарльз Диккенс"), book.authors)
         assertEquals(1909, book.firstPublishYear)
+        assertEquals(1909, book.editionYear)
+        assertEquals("М. П. Волошинова", book.translator)
         assertEquals(TextEditionType.HISTORICAL_ORTHOGRAPHY, book.textEditionType)
         assertEquals("ПСС 1909", book.editionLabel)
         assertTrue(book.isDownloadable)

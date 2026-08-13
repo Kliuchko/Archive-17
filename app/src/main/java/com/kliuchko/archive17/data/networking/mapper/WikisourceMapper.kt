@@ -19,6 +19,7 @@ fun WikisourceSearchResponseDto.toFreeBooks(languageCode: String): List<FreeBook
                 ?: return@mapNotNull null
             val snippet = result.snippet.toPlainText()
             val author = snippet.extractAuthor()
+            val editionYear = snippet.extractYear() ?: pageTitle.extractYear()
             val isLikelyChapter = pageTitle.isLikelyChapter()
             val editionType = pageTitle.toTextEditionType()
             FreeBook(
@@ -27,8 +28,10 @@ fun WikisourceSearchResponseDto.toFreeBooks(languageCode: String): List<FreeBook
                 title = pageTitle.toCatalogTitle(),
                 authors = listOfNotNull(author),
                 coverId = null,
-                firstPublishYear = snippet.extractYear() ?: pageTitle.extractYear(),
+                firstPublishYear = editionYear,
                 languageCode = languageCode,
+                editionYear = editionYear,
+                translator = snippet.extractTranslator(),
                 source = FreeBookSource.WIKISOURCE,
                 sourcePageTitle = pageTitle,
                 epubDownloadUrl = if (author != null && !isLikelyChapter) {
@@ -92,6 +95,13 @@ private fun String.extractYear(): Int? = YEAR_PATTERN
     ?.value
     ?.toIntOrNull()
 
+private fun String.extractTranslator(): String? = TRANSLATOR_PATTERN
+    .find(this)
+    ?.groupValues
+    ?.getOrNull(1)
+    ?.trim(' ', '.', ',', ';')
+    ?.takeIf(String::isNotEmpty)
+
 private fun String.toCatalogTitle(): String = substringBefore('/')
     .replace(AUTHOR_SUFFIX_PATTERN, "")
     .trim()
@@ -137,6 +147,11 @@ private val AUTHOR_PATTERN = Regex(
     RegexOption.IGNORE_CASE,
 )
 private val YEAR_PATTERN = Regex("\\b(?:1[0-9]{3}|20[0-2][0-9])\\b")
+private val TRANSLATOR_PATTERN = Regex(
+    "(?:пер\\.|перевод(?:чик|чики|а)?)\\s*[:.]?\\s*(.+?)" +
+        "(?=\\s*,?\\s*(?:[12][0-9]{3}|←|→)|$)",
+    RegexOption.IGNORE_CASE,
+)
 private val AUTHOR_SUFFIX_PATTERN = Regex("\\s+\\([^()]+\\)$")
 private val CHAPTER_MARKER_PATTERN = Regex(
     "(?:^|\\s)(?:глава|chapter|сцена|scene|песнь|song)\\b",

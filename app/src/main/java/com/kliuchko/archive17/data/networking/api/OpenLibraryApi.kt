@@ -39,6 +39,7 @@ interface OpenLibraryApi {
         const val FREE_SEARCH_FIELDS =
             "key,title,author_name,cover_i,first_publish_year,language,ebook_access," +
                 "editions,editions.key,editions.title,editions.language,editions.ebook_access," +
-                "editions.ia,editions.cover_i,editions.isbn"
+                "editions.ia,editions.cover_i,editions.isbn," +
+                "editions.publish_date,editions.publisher,editions.contributor"
     }
 }

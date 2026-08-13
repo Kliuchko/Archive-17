@@ -31,6 +31,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.kliuchko.archive17.R
 import com.kliuchko.archive17.domain.model.FreeAccessBasis
 import com.kliuchko.archive17.domain.model.EditionAvailability
+import com.kliuchko.archive17.domain.model.EditionAccessMode
 import com.kliuchko.archive17.domain.model.PublicationEdition
 import com.kliuchko.archive17.domain.model.TextEditionType
 import com.kliuchko.archive17.domain.model.TemporaryBook
@@ -184,6 +185,24 @@ fun FreeBookDetailsScreen(
                         value = label,
                     )
                 }
+                book.translator?.let { translator ->
+                    DetailFact(
+                        label = stringResource(R.string.edition_translator_label),
+                        value = translator,
+                    )
+                }
+                book.publisher?.let { publisher ->
+                    DetailFact(
+                        label = stringResource(R.string.edition_publisher_label),
+                        value = publisher,
+                    )
+                }
+                book.editionYear?.let { year ->
+                    DetailFact(
+                        label = stringResource(R.string.edition_year_label),
+                        value = year.toString(),
+                    )
+                }
                 Text(
                     text = stringResource(R.string.catalog_language_scope),
                     style = MaterialTheme.typography.bodySmall,
@@ -325,19 +344,28 @@ private fun RelatedEditionCard(
                     edition.textEditionType.takeIf {
                         it == TextEditionType.HISTORICAL_ORTHOGRAPHY
                     }?.let { stringResource(R.string.historical_orthography_warning) },
+                    edition.publishedYear?.toString(),
                     edition.label,
                 ).joinToString(" · "),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+            edition.translator?.let { translator ->
+                Text(
+                    text = stringResource(R.string.edition_translator_value, translator),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            edition.publisher?.let { publisher ->
+                Text(
+                    text = publisher,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
             Text(
-                text = stringResource(
-                    if (access?.availability == EditionAvailability.AVAILABLE) {
-                        R.string.public_access
-                    } else {
-                        R.string.open_edition
-                    },
-                ),
+                text = editionAccessLabel(access?.mode, access?.availability),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.primary,
             )
@@ -348,8 +376,32 @@ private fun RelatedEditionCard(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
+            TextButton(onClick = onClick) {
+                Text(stringResource(R.string.choose_edition))
+            }
         }
     }
+}
+
+@Composable
+private fun editionAccessLabel(
+    mode: EditionAccessMode?,
+    availability: EditionAvailability?,
+): String = when (availability) {
+    EditionAvailability.COMING_SOON -> stringResource(R.string.edition_access_coming_soon)
+    EditionAvailability.REGION_RESTRICTED ->
+        stringResource(R.string.edition_access_region_restricted)
+    EditionAvailability.UNAVAILABLE -> stringResource(R.string.edition_access_unavailable)
+    EditionAvailability.EXTERNAL_ONLY -> stringResource(R.string.edition_access_external)
+    EditionAvailability.AVAILABLE -> when (mode) {
+        EditionAccessMode.FREE -> stringResource(R.string.edition_access_free)
+        EditionAccessMode.SUBSCRIPTION -> stringResource(R.string.edition_access_subscription)
+        EditionAccessMode.PURCHASE -> stringResource(R.string.edition_access_purchase)
+        EditionAccessMode.PARTNER_PURCHASE -> stringResource(R.string.edition_access_partner)
+        EditionAccessMode.OWNED_FILE -> stringResource(R.string.edition_access_owned_file)
+        null -> stringResource(R.string.open_edition)
+    }
+    null -> stringResource(R.string.open_edition)
 }
 
 @Composable

@@ -48,4 +48,10 @@ data class OpenLibraryEditionSearchDto(
     val coverId: Int? = null,
     @SerializedName("isbn")
     val isbns: List<String>? = null,
+    @SerializedName("publish_date")
+    val publishDate: String? = null,
+    @SerializedName("publisher")
+    val publishers: List<String>? = null,
+    @SerializedName("contributor")
+    val contributors: List<String>? = null,
 )

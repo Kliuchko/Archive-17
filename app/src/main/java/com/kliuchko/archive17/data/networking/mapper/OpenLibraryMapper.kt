@@ -49,6 +49,9 @@ fun OpenLibrarySearchResponseDto.toFreeBooks(expectedLanguageCode: String? = nul
             coverId = document.preferredCoverId(edition),
             firstPublishYear = document.firstPublishYear,
             languageCode = languageCode,
+            editionYear = edition.publishDate.toEditionYear(),
+            translator = edition.contributors.extractTranslator(),
+            publisher = edition.publishers.normalizeList().firstOrNull(),
             archiveIdentifier = archiveIdentifier,
         )
     }
@@ -173,6 +176,16 @@ private fun List<String>?.normalizeList(): List<String> =
         .mapNotNull { it.normalize() }
         .distinct()
 
+private fun String?.toEditionYear(): Int? = this
+    ?.let { value -> EDITION_YEAR_PATTERN.find(value)?.value }
+    ?.toIntOrNull()
+
+private fun List<String>?.extractTranslator(): String? = normalizeList()
+    .firstOrNull { contributor -> TRANSLATOR_MARKER.containsMatchIn(contributor) }
+    ?.replace(TRANSLATOR_MARKER, "")
+    ?.trim(' ', ',', ';', ':', '(', ')')
+    ?.takeIf(String::isNotBlank)
+
 private fun JsonElement?.toDescription(): String? {
     if (this == null || isJsonNull) return null
 
@@ -186,6 +199,11 @@ private fun JsonElement?.toDescription(): String? {
 private const val PUBLIC_ACCESS = "public"
 private const val RUSSIAN_LANGUAGE = "rus"
 private val COMBINING_MARKS_PATTERN = Regex("\\p{M}+")
+private val EDITION_YEAR_PATTERN = Regex("\\b(?:1[0-9]{3}|20[0-2][0-9])\\b")
+private val TRANSLATOR_MARKER = Regex(
+    "(?:translator|translated by|перевод(?:чик|чики)?|пер\\.)",
+    RegexOption.IGNORE_CASE,
+)
 private val NON_LETTER_PATTERN = Regex("[^\\p{L}]+")
 private val TRAILING_LATIN_PARENTHESIS_PATTERN = Regex("\\s*\\([^)]*[A-Za-z][^)]*\\)\\s*$")
 private val COMMON_ENGLISH_TITLE_WORDS = setOf(
