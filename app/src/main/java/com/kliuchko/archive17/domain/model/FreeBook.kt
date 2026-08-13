@@ -12,6 +12,7 @@ data class FreeBook(
     val coverId: Int?,
     val coverUrl: String? = null,
     val firstPublishYear: Int?,
+    val catalogEditionCount: Int? = null,
     val languageCode: String,
     val editionYear: Int? = null,
     val translator: String? = null,

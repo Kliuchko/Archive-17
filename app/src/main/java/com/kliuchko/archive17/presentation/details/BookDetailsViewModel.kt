@@ -7,6 +7,7 @@ import com.kliuchko.archive17.domain.model.FreeBook
 import com.kliuchko.archive17.domain.model.PublicationEdition
 import com.kliuchko.archive17.domain.model.ReadingStatus
 import com.kliuchko.archive17.domain.model.toPublicationEdition
+import com.kliuchko.archive17.domain.model.groupMeaningfulVariants
 import com.kliuchko.archive17.domain.repository.BookRepository
 import com.kliuchko.archive17.domain.repository.FreeBookRepository
 import com.kliuchko.archive17.domain.repository.LanguageSettingsRepository
@@ -171,6 +172,10 @@ class BookDetailsViewModel(
         _uiState.update { it.copy(temporaryBook = null) }
     }
 
+    fun showAllEditionVariants() {
+        _uiState.update { it.copy(showAllEditionVariants = true) }
+    }
+
     private fun observeDetails() {
         viewModelScope.launch {
             repository.observeWorkDetails(workId).collect { details ->
@@ -208,11 +213,13 @@ class BookDetailsViewModel(
             val freeEditions = freeBooks.map(FreeBook::toPublicationEdition)
             val editions = (freeEditions + metadata)
                 .distinctBy(PublicationEdition::id)
+                .groupMeaningfulVariants(languageCode)
             _uiState.update {
                 it.copy(
                     editions = editions,
                     freeBooksByEditionId = freeBooks.associateBy(FreeBook::editionId),
                     isLoadingEditions = false,
+                    showAllEditionVariants = false,
                 )
             }
         }

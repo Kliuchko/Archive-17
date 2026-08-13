@@ -17,6 +17,7 @@ data class BookDetailsUiState(
     val editions: List<PublicationEdition> = emptyList(),
     val freeBooksByEditionId: Map<String, FreeBook> = emptyMap(),
     val isLoadingEditions: Boolean = false,
+    val showAllEditionVariants: Boolean = false,
     val downloadingEditionId: String? = null,
     val readingEditionId: String? = null,
     val downloadedBookId: String? = null,
@@ -32,12 +33,22 @@ data class BookDetailsUiState(
             freeBooksByEditionId[edition.id]
         }
 
+    val visibleEditions: List<PublicationEdition>
+        get() = if (showAllEditionVariants) editions else editions.take(PREVIEW_EDITION_COUNT)
+
+    val hiddenEditionCount: Int
+        get() = (editions.size - PREVIEW_EDITION_COUNT).coerceAtLeast(0)
+
     val languageLabel: String
         get() = work?.editionLanguages
             .orEmpty()
             .takeIf { it.isNotEmpty() }
             ?.joinToString()
             ?: "Не указан"
+
+    companion object {
+        const val PREVIEW_EDITION_COUNT = 3
+    }
 }
 
 fun ReadingStatus.displayName(): String =

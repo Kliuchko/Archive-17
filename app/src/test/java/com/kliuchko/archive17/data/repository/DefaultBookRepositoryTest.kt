@@ -14,6 +14,7 @@ import com.kliuchko.archive17.data.networking.api.OpenLibraryApi
 import com.kliuchko.archive17.data.networking.dto.OpenLibrarySearchDocDto
 import com.kliuchko.archive17.data.networking.dto.OpenLibrarySearchResponseDto
 import com.kliuchko.archive17.data.networking.dto.OpenLibraryWorkDto
+import com.kliuchko.archive17.data.networking.dto.OpenLibraryWorkEditionsDto
 import com.kliuchko.archive17.domain.model.ReadingStatus
 import com.kliuchko.archive17.domain.model.Work
 import com.kliuchko.archive17.domain.repository.RepositoryResult
@@ -292,6 +293,12 @@ private class FakeOpenLibraryApi : OpenLibraryApi {
         workError?.let { throw it }
         return workResponse
     }
+
+    override suspend fun getWorkEditions(
+        workId: String,
+        limit: Int,
+        offset: Int,
+    ): OpenLibraryWorkEditionsDto = OpenLibraryWorkEditionsDto()
 }
 
 private class FakeWorkDao : WorkDao {

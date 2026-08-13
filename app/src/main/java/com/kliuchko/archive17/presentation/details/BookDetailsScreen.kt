@@ -21,6 +21,7 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -212,13 +213,6 @@ fun BookDetailsScreen(
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                    work.editionCount?.let { count ->
-                        Text(
-                            text = stringResource(R.string.catalog_editions_found, count),
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.primary,
-                        )
-                    }
                     when {
                         uiState.isLoadingEditions -> CircularProgressIndicator()
                         uiState.editions.isEmpty() -> Text(
@@ -226,19 +220,31 @@ fun BookDetailsScreen(
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
-                        else -> uiState.editions.forEach { edition ->
-                            WorkEditionCard(
-                                edition = edition,
-                                isFree = edition.id in uiState.freeBooksByEditionId,
-                                isBusy = uiState.readingEditionId != null ||
-                                    uiState.downloadingEditionId != null,
-                                onRead = uiState.freeBooksByEditionId[edition.id]?.let { book ->
-                                    { viewModel.readNow(book) }
-                                },
-                                onAddToShelf = uiState.freeBooksByEditionId[edition.id]?.let { book ->
-                                    { viewModel.addEditionToShelf(book) }
-                                },
-                            )
+                        else -> {
+                            uiState.visibleEditions.forEach { edition ->
+                                WorkEditionCard(
+                                    edition = edition,
+                                    isFree = edition.id in uiState.freeBooksByEditionId,
+                                    isBusy = uiState.readingEditionId != null ||
+                                        uiState.downloadingEditionId != null,
+                                    onRead = uiState.freeBooksByEditionId[edition.id]?.let { book ->
+                                        { viewModel.readNow(book) }
+                                    },
+                                    onAddToShelf = uiState.freeBooksByEditionId[edition.id]?.let { book ->
+                                        { viewModel.addEditionToShelf(book) }
+                                    },
+                                )
+                            }
+                            if (!uiState.showAllEditionVariants && uiState.hiddenEditionCount > 0) {
+                                TextButton(onClick = viewModel::showAllEditionVariants) {
+                                    Text(
+                                        stringResource(
+                                            R.string.show_other_edition_variants,
+                                            uiState.hiddenEditionCount,
+                                        ),
+                                    )
+                                }
+                            }
                         }
                     }
                 }
@@ -317,10 +323,8 @@ private fun WorkEditionCard(
             Text(edition.title, style = MaterialTheme.typography.titleMedium)
             Text(
                 text = listOfNotNull(
-                    editionLanguageName(edition.languageCode),
-                    edition.publishedYear?.toString(),
+                    editionLanguageLabel(edition),
                     edition.translator?.let { stringResource(R.string.edition_translator_value, it) },
-                    edition.publisher,
                 ).joinToString(" · "),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -381,6 +385,19 @@ private fun editionLanguageName(code: String): String = stringResource(
         else -> R.string.language_other
     },
 )
+
+@Composable
+private fun editionLanguageLabel(edition: PublicationEdition): String {
+    val language = editionLanguageName(edition.languageCode)
+    val qualifier = when (edition.textEditionType) {
+        com.kliuchko.archive17.domain.model.TextEditionType.HISTORICAL_ORTHOGRAPHY ->
+            stringResource(R.string.edition_language_historical)
+        com.kliuchko.archive17.domain.model.TextEditionType.MODERN_ORTHOGRAPHY ->
+            stringResource(R.string.edition_language_modern)
+        com.kliuchko.archive17.domain.model.TextEditionType.UNSPECIFIED -> null
+    }
+    return qualifier?.let { "$language ($it)" } ?: language
+}
 
 @Composable
 private fun accessLabel(

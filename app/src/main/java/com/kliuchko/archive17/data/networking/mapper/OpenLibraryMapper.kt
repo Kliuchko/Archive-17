@@ -5,12 +5,14 @@ import com.kliuchko.archive17.data.networking.dto.OpenLibraryEditionSearchDto
 import com.kliuchko.archive17.data.networking.dto.OpenLibrarySearchDocDto
 import com.kliuchko.archive17.data.networking.dto.OpenLibrarySearchResponseDto
 import com.kliuchko.archive17.data.networking.dto.OpenLibraryWorkDto
+import com.kliuchko.archive17.data.networking.dto.OpenLibraryWorkEditionsDto
 import com.kliuchko.archive17.domain.model.Work
 import com.kliuchko.archive17.domain.model.FreeBook
 import com.kliuchko.archive17.domain.model.EditionAccessMode
 import com.kliuchko.archive17.domain.model.EditionAccessOption
 import com.kliuchko.archive17.domain.model.EditionAvailability
 import com.kliuchko.archive17.domain.model.PublicationEdition
+import com.kliuchko.archive17.domain.model.TextEditionType
 import java.text.Normalizer
 
 fun OpenLibrarySearchResponseDto.toDomain(): List<Work> = docs.mapNotNull { it.toDomain() }
@@ -52,6 +54,7 @@ fun OpenLibrarySearchResponseDto.toFreeBooks(expectedLanguageCode: String? = nul
             authors = document.authorNames.normalizeList(),
             coverId = document.preferredCoverId(edition),
             firstPublishYear = document.firstPublishYear,
+            catalogEditionCount = document.editionCount,
             languageCode = languageCode,
             editionYear = edition.publishDate.toEditionYear(),
             translator = edition.contributors.extractTranslator(),
@@ -101,6 +104,47 @@ fun OpenLibrarySearchResponseDto.toPublicationEditions(
             )
         }
 }
+
+fun OpenLibraryWorkEditionsDto.toPublicationEditions(work: Work): List<PublicationEdition> =
+    entries.mapNotNull { edition ->
+        val editionId = edition.key
+            ?.removePrefix("/books/")
+            ?.takeIf(String::isNotBlank)
+            ?: return@mapNotNull null
+        val languageCode = edition.languages
+            .orEmpty()
+            .firstNotNullOfOrNull { language ->
+                language.key
+                    ?.removePrefix("/languages/")
+                    ?.takeIf(String::isNotBlank)
+            }
+            ?: return@mapNotNull null
+        val title = localizedTitle(
+            editionTitle = edition.title,
+            workTitle = work.title,
+            languageCode = languageCode,
+        ) ?: return@mapNotNull null
+        PublicationEdition(
+            id = editionId,
+            workId = work.id,
+            title = title,
+            authors = work.authors,
+            languageCode = languageCode,
+            translator = edition.contributions.extractTranslator(),
+            publishedYear = edition.publishDate.toEditionYear(),
+            publisher = edition.publishers.normalizeList().firstOrNull(),
+            textEditionType = detectTextEditionType(languageCode, title),
+            coverId = edition.coverIds?.firstOrNull(),
+            accessOptions = listOf(
+                EditionAccessOption(
+                    mode = EditionAccessMode.REFERENCE,
+                    availability = EditionAvailability.UNAVAILABLE,
+                    providerName = OPEN_LIBRARY_NAME,
+                    actionUrl = "$OPEN_LIBRARY_BOOK_URL$editionId",
+                ),
+            ),
+        )
+    }
 
 fun OpenLibrarySearchDocDto.toDomain(lastUpdatedAt: Long? = null): Work? {
     val workId = key.toWorkId() ?: return null
@@ -153,6 +197,12 @@ internal fun String?.toWorkId(): String? {
 }
 
 private fun String?.normalize(): String? = this?.trim()?.takeIf { it.isNotEmpty() }
+
+private fun detectTextEditionType(languageCode: String, title: String): TextEditionType = when {
+    languageCode == RUSSIAN_LANGUAGE && HISTORICAL_RUSSIAN_TEXT_PATTERN.containsMatchIn(title) ->
+        TextEditionType.HISTORICAL_ORTHOGRAPHY
+    else -> TextEditionType.UNSPECIFIED
+}
 
 internal fun localizedTitle(
     editionTitle: String?,
@@ -246,6 +296,7 @@ private const val PUBLIC_ACCESS = "public"
 private const val OPEN_LIBRARY_NAME = "Open Library"
 private const val OPEN_LIBRARY_BOOK_URL = "https://openlibrary.org/books/"
 private const val RUSSIAN_LANGUAGE = "rus"
+private val HISTORICAL_RUSSIAN_TEXT_PATTERN = Regex("[ѣѳѵ]|\\(до\\)", RegexOption.IGNORE_CASE)
 private val COMBINING_MARKS_PATTERN = Regex("\\p{M}+")
 private val EDITION_YEAR_PATTERN = Regex("\\b(?:1[0-9]{3}|20[0-2][0-9])\\b")
 private val TRANSLATOR_MARKER = Regex(

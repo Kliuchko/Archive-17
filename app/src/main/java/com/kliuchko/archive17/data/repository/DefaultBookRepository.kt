@@ -84,6 +84,7 @@ class DefaultBookRepository(
             )
                 .distinctBy(Work::id)
                 .map { it.copy(lastUpdatedAt = now) }
+                .sortedWith(WORK_POPULARITY_ORDER)
 
             workDao.upsertWorks(works.map { it.toEntity(now) })
             RepositoryResult.Success(works)
@@ -100,6 +101,7 @@ class DefaultBookRepository(
                 work.title.toCatalogSearchKey().contains(key) ||
                     work.authors.any { author -> author.toCatalogSearchKey().contains(key) }
             }
+            .sortedWith(WORK_POPULARITY_ORDER)
             .take(limit.coerceIn(1, CACHED_SEARCH_RESULT_LIMIT))
             .toList()
     }
@@ -173,22 +175,30 @@ class DefaultBookRepository(
         val languageCodes = listOf(preferredLanguageCode, fallbackLanguageCode)
             .filter { it.matches(EDITION_LANGUAGE_PATTERN) }
             .distinct()
-        val responses = coroutineScope {
+        val (workEditions, searchResponses) = coroutineScope {
+            val editions = async {
+                runCatching {
+                    api.getWorkEditions(work.id).toPublicationEditions(work)
+                }.getOrDefault(emptyList())
+            }
             languageCodes.map { languageCode ->
                 async {
-                    languageCode to api.searchEditionMetadata(
-                        query = work.title,
-                        language = languageCode,
-                        responseLanguage = languageCode.toIso6391(),
-                    )
+                    runCatching {
+                        languageCode to api.searchEditionMetadata(
+                            query = work.title,
+                            language = languageCode,
+                            responseLanguage = languageCode.toIso6391(),
+                        )
+                    }.getOrNull()
                 }
-            }.awaitAll()
+            }.awaitAll().filterNotNull().let { responses -> editions.await() to responses }
         }
-        val editions = responses
+        val metadataEditions = searchResponses
             .flatMap { (languageCode, response) ->
                 response.toPublicationEditions(languageCode)
             }
             .filter { edition -> edition.workId == work.id }
+        val editions = (workEditions + metadataEditions)
             .distinctBy(PublicationEdition::id)
             .sortedWith(
                 compareByDescending<PublicationEdition> {
@@ -262,6 +272,9 @@ class DefaultBookRepository(
         private const val ENGLISH_EDITION_LANGUAGE = "eng"
         private const val RUSSIAN_EDITION_LANGUAGE = "rus"
         private val EDITION_LANGUAGE_PATTERN = Regex("[a-z]{3}")
+        private val WORK_POPULARITY_ORDER =
+            compareByDescending<Work> { it.editionCount ?: 0 }
+                .thenBy(String.CASE_INSENSITIVE_ORDER) { it.title }
     }
 }
 

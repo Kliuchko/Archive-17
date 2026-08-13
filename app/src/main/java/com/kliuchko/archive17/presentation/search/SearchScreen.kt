@@ -512,11 +512,7 @@ private fun FreeBookResultCard(
                 )
                 if (editionCount > 1) {
                     Text(
-                        text = androidx.compose.ui.res.pluralStringResource(
-                            R.plurals.available_edition_count,
-                            editionCount,
-                            editionCount,
-                        ),
+                        text = stringResource(R.string.edition_variants_available),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.primary,
                     )
@@ -793,8 +789,7 @@ private fun localizedLanguageName(code: String): String = stringResource(
 @Composable
 private fun Work.metadataLine(): String {
     val published = firstPublishYear?.let { "$it" }
-    val editions = editionCount?.let { stringResource(R.string.edition_count, it) }
-    return listOfNotNull(published, editions)
+    return listOfNotNull(published)
         .joinToString(" · ")
         .ifBlank { stringResource(R.string.edition_details_pending) }
 }

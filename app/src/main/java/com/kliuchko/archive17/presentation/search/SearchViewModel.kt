@@ -498,6 +498,7 @@ class SearchViewModel(
             .groupBy { book -> book.workId.ifBlank { book.catalogTitleKey } }
             .values
             .map { editions -> editions.sortedWith(editionPreference(selectedLanguageCode)) }
+            .sortedByDescending { editions -> editions.meaningfulEditionCount() }
         val verifiedWorkIds = verified.mapTo(mutableSetOf(), FreeBook::workId)
         val remaining = filterNot { it.editionId in verifiedIds }
         return ClassifiedFreeBooks(
@@ -505,7 +506,8 @@ class SearchViewModel(
             alternatives = groupedEditions.flatMap { it.drop(1) },
             other = remaining
                 .filterNot { it.workId in verifiedWorkIds }
-                .distinctBy { it.workId.ifBlank { it.catalogTitleKey } },
+                .distinctBy { it.workId.ifBlank { it.catalogTitleKey } }
+                .sortedByDescending { book -> book.catalogEditionCount ?: 0 },
             editionCounts = editionCounts(),
         )
     }
@@ -566,7 +568,7 @@ class SearchViewModel(
                 isLoading = isRefreshing,
                 isCheckingFreeBooks = false,
                 isLoadingNextPage = false,
-                books = books,
+                books = books.sortedByPopularity(),
                 freeBooks = emptyList(),
                 alternativeEditionBooks = emptyList(),
                 otherLanguageBooks = emptyList(),
@@ -651,7 +653,9 @@ class SearchViewModel(
     private fun appendAllBooksPage(books: List<Work>, page: Int, notice: String? = null) {
         _uiState.update { state ->
             state.copy(
-                books = (state.books + books).distinctBy(Work::id),
+                books = (state.books + books)
+                    .distinctBy(Work::id)
+                    .sortedByPopularity(),
                 isLoadingNextPage = false,
                 canLoadMore = books.isNotEmpty(),
                 nextPageError = null,
@@ -701,6 +705,7 @@ class SearchViewModel(
             .groupBy { book -> book.workId.ifBlank { book.catalogTitleKey } }
             .values
             .map { editions -> editions.sortedWith(editionPreference(bookLanguageCode)) }
+            .sortedByDescending { editions -> editions.meaningfulEditionCount() }
         val verified = selectedEditions.mapNotNull(List<FreeBook>::firstOrNull)
         val alternatives = selectedEditions.flatMap { it.drop(1) }
         val verifiedIds = (verified + alternatives)
@@ -708,6 +713,7 @@ class SearchViewModel(
         val other = (otherFreeBooks + page.other)
             .distinctBy(FreeBook::editionId)
             .filterNot { it.editionId in verifiedIds }
+            .sortedByDescending { book -> book.catalogEditionCount ?: 0 }
         return copy(
             freeBooks = verified,
             alternativeEditionBooks = alternatives,
@@ -748,7 +754,7 @@ class SearchViewModel(
 
     private fun List<FreeBook>.editionCounts(): Map<String, Int> = groupBy(FreeBook::workId)
         .filterKeys(String::isNotBlank)
-        .mapValues { (_, editions) -> editions.distinctBy(FreeBook::editionId).size }
+        .mapValues { (_, editions) -> editions.meaningfulEditionCount() }
 
     private fun Int?.orEmptyCount(): Int = this ?: 0
 
@@ -770,7 +776,7 @@ class SearchViewModel(
                     authors = representative.authors,
                     coverId = representative.coverId,
                     firstPublishYear = representative.firstPublishYear,
-                    editionCount = editions.distinctBy(FreeBook::editionId).size,
+                    editionCount = editions.meaningfulEditionCount(),
                     editionLanguages = editions.map(FreeBook::languageCode).distinct(),
                     description = null,
                     subjects = emptyList(),
@@ -779,4 +785,14 @@ class SearchViewModel(
             }
         if (works.isNotEmpty()) repository.cacheCatalogWorks(works)
     }
+
+    private fun List<FreeBook>.meaningfulEditionCount(): Int = maxOf(
+        distinctBy(FreeBook::editionId).size,
+        maxOfOrNull { book -> book.catalogEditionCount ?: 0 } ?: 0,
+    )
+
+    private fun List<Work>.sortedByPopularity(): List<Work> = sortedWith(
+        compareByDescending<Work> { work -> work.editionCount ?: 0 }
+            .thenBy(String.CASE_INSENSITIVE_ORDER) { work -> work.title },
+    )
 }

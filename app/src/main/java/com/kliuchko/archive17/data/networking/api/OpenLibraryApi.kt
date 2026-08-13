@@ -2,6 +2,7 @@ package com.kliuchko.archive17.data.networking.api
 
 import com.kliuchko.archive17.data.networking.dto.OpenLibrarySearchResponseDto
 import com.kliuchko.archive17.data.networking.dto.OpenLibraryWorkDto
+import com.kliuchko.archive17.data.networking.dto.OpenLibraryWorkEditionsDto
 import retrofit2.http.GET
 import retrofit2.http.Path
 import retrofit2.http.Query
@@ -41,14 +42,22 @@ interface OpenLibraryApi {
         @Path("workId") workId: String,
     ): OpenLibraryWorkDto
 
+    @GET("works/{workId}/editions.json")
+    suspend fun getWorkEditions(
+        @Path("workId") workId: String,
+        @Query("limit") limit: Int = WORK_EDITIONS_LIMIT,
+        @Query("offset") offset: Int = 0,
+    ): OpenLibraryWorkEditionsDto
+
     companion object {
         const val BASE_URL = "https://openlibrary.org/"
         const val SEARCH_LIMIT = 20
         const val FREE_SEARCH_LIMIT = 12
         const val EDITION_METADATA_LIMIT = 5
+        const val WORK_EDITIONS_LIMIT = 30
         const val SEARCH_FIELDS = "key,title,author_name,cover_i,first_publish_year,edition_count,language"
         const val FREE_SEARCH_FIELDS =
-            "key,title,author_name,cover_i,first_publish_year,language,ebook_access," +
+            "key,title,author_name,cover_i,first_publish_year,edition_count,language,ebook_access," +
                 "editions,editions.key,editions.title,editions.language,editions.ebook_access," +
                 "editions.ia,editions.cover_i,editions.isbn," +
                 "editions.publish_date,editions.publisher,editions.contributor"
