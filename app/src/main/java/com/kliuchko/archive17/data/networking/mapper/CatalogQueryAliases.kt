@@ -11,4 +11,6 @@ private val NON_ALPHANUMERIC = Regex("[^\\p{L}\\p{N}]+")
 
 private val CATALOG_QUERY_ALIASES = mapOf(
     "аллатра" to "AllatRa",
+    "стальнаякрыса" to "The Stainless Steel Rat",
+    "гарригаррисон" to "Harry Harrison",
 )

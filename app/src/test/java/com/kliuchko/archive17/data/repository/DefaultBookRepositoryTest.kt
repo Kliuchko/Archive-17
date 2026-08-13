@@ -80,6 +80,13 @@ class DefaultBookRepositoryTest {
     }
 
     @Test
+    fun `search uses source title for Russian Stainless Steel Rat query`() = runBlocking {
+        repository.searchBooks("Стальная Крыса")
+
+        assertEquals("The Stainless Steel Rat", api.lastSearchQuery)
+    }
+
+    @Test
     fun `refresh details updates cached work`() = runBlocking {
         workDao.upsertWork(sampleWork(lastUpdatedAt = 10L).toEntity(now = 10L))
         api.workResponse = OpenLibraryWorkDto(
@@ -210,6 +217,7 @@ private class FakeOpenLibraryApi : OpenLibraryApi {
     var workError: Throwable? = null
     var searchCallCount = 0
     var lastSearchPage = 1
+    var lastSearchQuery = ""
 
     override suspend fun searchBooks(
         query: String,
@@ -218,6 +226,7 @@ private class FakeOpenLibraryApi : OpenLibraryApi {
         page: Int,
     ): OpenLibrarySearchResponseDto {
         searchCallCount += 1
+        lastSearchQuery = query
         lastSearchPage = page
         searchError?.let { throw it }
         return searchResponse

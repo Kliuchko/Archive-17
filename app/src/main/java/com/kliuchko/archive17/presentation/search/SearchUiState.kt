@@ -27,6 +27,7 @@ data class SearchUiState(
     val temporaryBook: TemporaryBook? = null,
     val errorMessage: String? = null,
     val actionMessage: String? = null,
+    val isFreeCatalogFallback: Boolean = false,
     val hasSearched: Boolean = false,
 ) {
     val showMinimumQueryState: Boolean

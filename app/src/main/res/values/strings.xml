@@ -166,6 +166,8 @@
     <string name="catalog_next_page_error">Следующий стеллаж пока не открылся.</string>
     <string name="free_catalog_empty">Открытых EPUB на выбранном языке не найдено</string>
     <string name="free_catalog_empty_body">Попробуйте другое название, автора или измените предпочтительный язык книг в Профиле.</string>
+    <string name="free_catalog_fallback_title">Книга есть в общем каталоге</string>
+    <string name="free_catalog_fallback_body">Подтверждённое бесплатное издание для выбранного языка и региона пока не найдено. Ниже показана карточка произведения.</string>
     <string name="catalog_error_body">Проверьте соединение и попробуйте ещё раз.</string>
     <string name="free_catalog_welcome">Найдите книгу, которую можно читать</string>
     <string name="free_catalog_welcome_body">Archive 17 найдёт открытое издание на выбранном языке, загрузит EPUB на Полку и сохранит его для чтения офлайн.</string>

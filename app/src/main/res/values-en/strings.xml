@@ -166,6 +166,8 @@
     <string name="catalog_next_page_error">The next shelf could not be opened yet.</string>
     <string name="free_catalog_empty">No open EPUBs found in the selected language</string>
     <string name="free_catalog_empty_body">Try another title or author, or change the preferred book language in Profile.</string>
+    <string name="free_catalog_fallback_title">The book is in the full catalog</string>
+    <string name="free_catalog_fallback_body">A confirmed free edition for the selected language and region was not found. The work is shown below.</string>
     <string name="catalog_error_body">Check your connection and try again.</string>
     <string name="free_catalog_welcome">Find a book you can read</string>
     <string name="free_catalog_welcome_body">Archive 17 will find an open edition in the selected language, download its EPUB to the Shelf, and keep it available offline.</string>

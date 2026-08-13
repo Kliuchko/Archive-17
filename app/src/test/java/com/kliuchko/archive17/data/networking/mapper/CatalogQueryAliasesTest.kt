@@ -13,6 +13,15 @@ class CatalogQueryAliasesTest {
 
     @Test
     fun `unrelated query is unchanged`() {
-        assertEquals("Стальная Крыса", "Стальная Крыса".withCatalogQueryAlias())
+        assertEquals("Дюна", "Дюна".withCatalogQueryAlias())
+    }
+
+    @Test
+    fun `Russian Stainless Steel Rat title and author use source spelling`() {
+        assertEquals(
+            "The Stainless Steel Rat",
+            "Стальная Крыса".withCatalogQueryAlias(),
+        )
+        assertEquals("Harry Harrison", "Гарри Гаррисон".withCatalogQueryAlias())
     }
 }

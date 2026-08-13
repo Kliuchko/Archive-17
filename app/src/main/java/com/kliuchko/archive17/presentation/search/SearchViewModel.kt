@@ -64,6 +64,7 @@ class SearchViewModel(
                 nextPageError = null,
                 errorMessage = null,
                 actionMessage = null,
+                isFreeCatalogFallback = false,
                 hasSearched = false,
                 freeBooks = if (normalizedLength in 1 until SearchUiState.MIN_QUERY_LENGTH) {
                     emptyList()
@@ -103,6 +104,7 @@ class SearchViewModel(
                 otherFreeBooks = emptyList(),
                 errorMessage = null,
                 actionMessage = null,
+                isFreeCatalogFallback = false,
                 hasSearched = false,
             )
         }
@@ -216,6 +218,7 @@ class SearchViewModel(
                     otherFreeBooks = emptyList(),
                     errorMessage = null,
                     actionMessage = null,
+                    isFreeCatalogFallback = false,
                     hasSearched = false,
                     selectedMode = request.mode,
                     bookLanguageCode = request.languageCode,
@@ -236,6 +239,7 @@ class SearchViewModel(
                 books = emptyList(),
                 freeBooks = emptyList(),
                 otherFreeBooks = emptyList(),
+                isFreeCatalogFallback = false,
                 selectedMode = request.mode,
                 bookLanguageCode = request.languageCode,
             )
@@ -256,6 +260,9 @@ class SearchViewModel(
                     canLoadMore = result.data.isNotEmpty(),
                 )
                 if (query.isBlank()) refreshStarterFreeBooks(result.data, languageCode)
+                if (query.isNotBlank() && result.data.isEmpty()) {
+                    showFullCatalogFallback(query)
+                }
             }
             is RepositoryResult.Cached -> {
                 showFreeBookCandidates(result.data, languageCode, result.message)
@@ -264,8 +271,36 @@ class SearchViewModel(
                     canLoadMore = result.data.isNotEmpty(),
                 )
                 if (query.isBlank()) refreshStarterFreeBooks(result.data, languageCode)
+                if (query.isNotBlank() && result.data.isEmpty()) {
+                    showFullCatalogFallback(query)
+                }
             }
             is RepositoryResult.Error -> showSearchError(result.message)
+        }
+    }
+
+    private suspend fun showFullCatalogFallback(query: String) {
+        val books = when (val result = repository.searchBooks(query, page = 1)) {
+            is RepositoryResult.Success -> result.data
+            is RepositoryResult.Cached -> result.data
+            is RepositoryResult.Error -> return
+        }
+        if (books.isEmpty()) return
+        activeRequest = null
+        _uiState.update {
+            it.copy(
+                isLoading = false,
+                isCheckingFreeBooks = false,
+                isLoadingNextPage = false,
+                canLoadMore = false,
+                books = books,
+                freeBooks = emptyList(),
+                otherFreeBooks = emptyList(),
+                errorMessage = null,
+                actionMessage = null,
+                isFreeCatalogFallback = true,
+                hasSearched = true,
+            )
         }
     }
 
@@ -298,6 +333,7 @@ class SearchViewModel(
                 books = emptyList(),
                 errorMessage = null,
                 actionMessage = notice,
+                isFreeCatalogFallback = false,
                 hasSearched = true,
             )
         }
@@ -422,6 +458,7 @@ class SearchViewModel(
                 otherFreeBooks = emptyList(),
                 errorMessage = null,
                 actionMessage = notice,
+                isFreeCatalogFallback = false,
                 hasSearched = true,
             )
         }
@@ -440,6 +477,7 @@ class SearchViewModel(
                 otherFreeBooks = emptyList(),
                 errorMessage = message,
                 actionMessage = null,
+                isFreeCatalogFallback = false,
                 hasSearched = true,
             )
         }

@@ -318,6 +318,21 @@ private fun SearchResults(
                     contentPadding = PaddingValues(top = 6.dp, bottom = 24.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
+                    if (uiState.isFreeCatalogFallback) {
+                        item(key = "free-catalog-fallback") {
+                            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                Text(
+                                    text = stringResource(R.string.free_catalog_fallback_title),
+                                    style = MaterialTheme.typography.titleMedium,
+                                )
+                                Text(
+                                    text = stringResource(R.string.free_catalog_fallback_body),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                        }
+                    }
                     uiState.actionMessage?.let { message ->
                         item(key = "catalog-message") {
                             CatalogMessage(message = message)
