@@ -81,13 +81,13 @@ class EpubReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener {
     private var searchSubmitted by mutableStateOf(false)
     private var searchUnavailable by mutableStateOf(false)
     private var readerStorageKey: String? = null
+    private var legacyReaderStorageKeys: List<String> = emptyList()
     private var searchJob: Job? = null
     private var totalPositions = 0
 
     override fun onCreate(savedInstanceState: Bundle?) {
         supportFragmentManager.fragmentFactory = EpubNavigatorFragment.createDummyFactory()
         super.onCreate(null)
-        readerPreferences = loadReaderPreferences()
         createContent()
 
         val bookId = intent.getStringExtra(EXTRA_BOOK_ID)
@@ -96,17 +96,22 @@ class EpubReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener {
             finish()
             return
         }
-        readerStorageKey = bookId?.let { "local:$it" }
-            ?: temporaryEditionId?.let { "temporary:$it" }
-        bookmarks = loadBookmarks()
-
         lifecycleScope.launch {
             val readerBook = if (bookId != null) {
                 localBookRepository.getLocalBook(bookId)?.let { book ->
+                    val migratedProgression = book.progressionJson
+                        ?: book.identifier?.let { editionId ->
+                            temporaryProgressionPreferences().getString(editionId, null)
+                        }
                     ReaderBook(
                         title = book.title,
                         file = File(book.filePath),
-                        progressionJson = book.progressionJson,
+                        progressionJson = migratedProgression,
+                        storageKey = book.identifier
+                            ?.takeIf(String::isNotBlank)
+                            ?.let { editionId -> "edition:$editionId" }
+                            ?: "local:${book.id}",
+                        legacyStorageKeys = listOf("local:${book.id}"),
                     )
                 }
             } else {
@@ -116,6 +121,11 @@ class EpubReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener {
                 showTitle(getString(R.string.book_unavailable))
                 return@launch
             }
+
+            readerStorageKey = readerBook.storageKey
+            legacyReaderStorageKeys = readerBook.legacyStorageKeys
+            readerPreferences = loadReaderPreferences()
+            bookmarks = loadBookmarks()
 
             try {
                 showTitle(readerBook.title)
@@ -200,6 +210,8 @@ class EpubReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener {
             title = title,
             file = file,
             progressionJson = temporaryProgressionPreferences().getString(editionId, null),
+            storageKey = "edition:$editionId",
+            legacyStorageKeys = listOf("temporary:$editionId"),
         )
     }
 
@@ -449,8 +461,9 @@ class EpubReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener {
 
     private fun loadBookmarks(): List<Locator> {
         val storageKey = readerStorageKey ?: return emptyList()
-        val raw = getSharedPreferences(READER_BOOKMARKS, MODE_PRIVATE)
-            .getString(storageKey, null)
+        val preferences = getSharedPreferences(READER_BOOKMARKS, MODE_PRIVATE)
+        val raw = (listOf(storageKey) + legacyReaderStorageKeys)
+            .firstNotNullOfOrNull { key -> preferences.getString(key, null) }
             ?: return emptyList()
         return runCatching {
             val array = JSONArray(raw)
@@ -475,25 +488,38 @@ class EpubReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener {
 
     private fun loadReaderPreferences(): ReaderPreferences {
         val preferences = getSharedPreferences(READER_PREFERENCES, MODE_PRIVATE)
+        val storageKey = readerStorageKey
+        fun keyed(key: String): String? = storageKey?.let { "$it:$key" }
         return ReaderPreferences.restored(
-            fontSize = preferences.getFloat(KEY_FONT_SIZE, DEFAULT_FONT_SIZE.toFloat()).toDouble(),
-            lineHeight = preferences.getFloat(KEY_LINE_HEIGHT, DEFAULT_LINE_HEIGHT.toFloat()).toDouble(),
-            font = preferences.getString(KEY_FONT, null)
+            fontSize = preferences.getFloat(
+                keyed(KEY_FONT_SIZE) ?: KEY_FONT_SIZE,
+                preferences.getFloat(KEY_FONT_SIZE, DEFAULT_FONT_SIZE.toFloat()),
+            ).toDouble(),
+            lineHeight = preferences.getFloat(
+                keyed(KEY_LINE_HEIGHT) ?: KEY_LINE_HEIGHT,
+                preferences.getFloat(KEY_LINE_HEIGHT, DEFAULT_LINE_HEIGHT.toFloat()),
+            ).toDouble(),
+            font = preferences.getString(keyed(KEY_FONT) ?: KEY_FONT, null)
+                ?.let { runCatching { ReaderFont.valueOf(it) }.getOrNull() }
+                ?: preferences.getString(KEY_FONT, null)
                 ?.let { runCatching { ReaderFont.valueOf(it) }.getOrNull() }
                 ?: ReaderFont.PUBLISHER,
-            theme = preferences.getString(KEY_THEME, null)
+            theme = preferences.getString(keyed(KEY_THEME) ?: KEY_THEME, null)
+                ?.let { runCatching { ReaderTheme.valueOf(it) }.getOrNull() }
+                ?: preferences.getString(KEY_THEME, null)
                 ?.let { runCatching { ReaderTheme.valueOf(it) }.getOrNull() }
                 ?: ReaderTheme.LIGHT,
         )
     }
 
     private fun saveReaderPreferences(preferences: ReaderPreferences) {
+        val storageKey = readerStorageKey ?: return
         getSharedPreferences(READER_PREFERENCES, MODE_PRIVATE)
             .edit()
-            .putFloat(KEY_FONT_SIZE, preferences.fontSize.toFloat())
-            .putFloat(KEY_LINE_HEIGHT, preferences.lineHeight.toFloat())
-            .putString(KEY_FONT, preferences.font.name)
-            .putString(KEY_THEME, preferences.theme.name)
+            .putFloat("$storageKey:$KEY_FONT_SIZE", preferences.fontSize.toFloat())
+            .putFloat("$storageKey:$KEY_LINE_HEIGHT", preferences.lineHeight.toFloat())
+            .putString("$storageKey:$KEY_FONT", preferences.font.name)
+            .putString("$storageKey:$KEY_THEME", preferences.theme.name)
             .apply()
     }
 
@@ -548,5 +574,7 @@ class EpubReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener {
         val title: String,
         val file: File,
         val progressionJson: String?,
+        val storageKey: String,
+        val legacyStorageKeys: List<String> = emptyList(),
     )
 }

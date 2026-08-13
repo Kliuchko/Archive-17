@@ -5,6 +5,7 @@ import com.kliuchko.archive17.domain.model.LocalBook
 
 fun LocalBookEntity.toDomain(): LocalBook = LocalBook(
     id = id,
+    workId = workId,
     title = title,
     author = author,
     identifier = identifier,
@@ -23,6 +24,7 @@ fun LocalBookEntity.toDomain(): LocalBook = LocalBook(
 
 fun LocalBook.toEntity(): LocalBookEntity = LocalBookEntity(
     id = id,
+    workId = workId,
     title = title,
     author = author,
     identifier = identifier,

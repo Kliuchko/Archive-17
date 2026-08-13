@@ -161,7 +161,7 @@
     <string name="free_source">Open Library · Internet Archive</string>
     <string name="regional_rights_notice">The source marks this edition as openly accessible. Rights for a specific edition may depend on the country.</string>
     <string name="download_to_shelf">Add to Shelf</string>
-    <string name="read_now">Read now</string>
+    <string name="read_now">Read online</string>
     <string name="opening_for_reading">Opening…</string>
     <string name="downloading_book">Downloading…</string>
     <string name="checking_epub">Checking EPUB…</string>
@@ -216,6 +216,10 @@
     <string name="edition_language_modern">modern orthography</string>
     <string name="edition_variants_available">Other text variants available</string>
     <string name="edition_original_language">Original · %1$s</string>
+    <string name="edition_selected">Selected edition</string>
+    <string name="select_edition">Select this edition</string>
+    <string name="open_purchase_offer">Continue to purchase</string>
+    <string name="open_subscription_offer">Open offer</string>
     <string name="access_label">Access</string>
     <string name="rights_basis_label">Access basis</string>
     <string name="rights_open_license">Open source license</string>

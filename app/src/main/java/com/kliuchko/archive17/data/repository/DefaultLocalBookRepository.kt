@@ -174,6 +174,7 @@ class DefaultLocalBookRepository(
                 val now = timeProvider.currentTimeMillis()
                 val book = LocalBook(
                     id = id,
+                    workId = metadata?.workId,
                     title = metadata?.title?.takeIf(String::isNotBlank)
                         ?: publication.metadata.title?.takeIf(String::isNotBlank)
                         ?: destination.nameWithoutExtension,

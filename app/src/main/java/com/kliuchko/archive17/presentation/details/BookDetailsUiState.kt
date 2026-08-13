@@ -16,6 +16,7 @@ data class BookDetailsUiState(
     val isStale: Boolean = false,
     val editions: List<PublicationEdition> = emptyList(),
     val originalLanguageCode: String? = null,
+    val selectedEditionId: String? = null,
     val freeBooksByEditionId: Map<String, FreeBook> = emptyMap(),
     val isLoadingEditions: Boolean = false,
     val isEnrichingEditions: Boolean = false,
@@ -31,7 +32,9 @@ data class BookDetailsUiState(
         get() = work != null && !isRefreshing
 
     val preferredFreeBook: FreeBook?
-        get() = editions.firstNotNullOfOrNull { edition ->
+        get() = editions
+            .sortedByDescending { edition -> edition.id == selectedEditionId }
+            .firstNotNullOfOrNull { edition ->
             freeBooksByEditionId[edition.id]
         }
 

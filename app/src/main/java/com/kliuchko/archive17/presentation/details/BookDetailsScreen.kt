@@ -49,6 +49,7 @@ fun BookDetailsScreen(
     workId: String,
     onBackClick: () -> Unit,
     onAuthorClick: (String) -> Unit,
+    onCommercialOfferClick: (String) -> Unit,
     onBookReady: (String) -> Unit,
     onTemporaryBookReady: (TemporaryBook) -> Unit,
     modifier: Modifier = Modifier,
@@ -246,6 +247,7 @@ fun BookDetailsScreen(
                                     edition = edition,
                                     isOriginal = edition.languageCode == uiState.originalLanguageCode,
                                     isEnriching = uiState.isEnrichingEditions,
+                                    isSelected = edition.id == uiState.selectedEditionId,
                                     isFree = edition.id in uiState.freeBooksByEditionId,
                                     isBusy = uiState.readingEditionId != null ||
                                         uiState.downloadingEditionId != null,
@@ -255,6 +257,8 @@ fun BookDetailsScreen(
                                     onAddToShelf = uiState.freeBooksByEditionId[edition.id]?.let { book ->
                                         { viewModel.addEditionToShelf(book) }
                                     },
+                                    onSelect = { viewModel.selectEdition(edition.id) },
+                                    onCommercialOfferClick = onCommercialOfferClick,
                                 )
                             }
                             if (!uiState.showAllEditionVariants && uiState.hiddenEditionCount > 0) {
@@ -334,10 +338,13 @@ private fun WorkEditionCard(
     edition: PublicationEdition,
     isOriginal: Boolean,
     isEnriching: Boolean,
+    isSelected: Boolean,
     isFree: Boolean,
     isBusy: Boolean,
     onRead: (() -> Unit)?,
     onAddToShelf: (() -> Unit)?,
+    onSelect: () -> Unit,
+    onCommercialOfferClick: (String) -> Unit,
 ) {
     val access = edition.accessOptions.firstOrNull()
     Card(
@@ -381,6 +388,20 @@ private fun WorkEditionCard(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
+            if (isSelected && access != null) {
+                Text(
+                    text = stringResource(R.string.edition_selected),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            } else if (access != null) {
+                TextButton(
+                    onClick = onSelect,
+                    enabled = !isBusy,
+                ) {
+                    Text(stringResource(R.string.select_edition))
+                }
+            }
             if (onRead != null && onAddToShelf != null) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -400,6 +421,19 @@ private fun WorkEditionCard(
                     ) {
                         Text(stringResource(R.string.download_to_shelf))
                     }
+                }
+            } else if (!access?.actionUrl.isNullOrBlank()) {
+                Button(
+                    onClick = { onCommercialOfferClick(checkNotNull(access?.actionUrl)) },
+                    enabled = !isBusy,
+                ) {
+                    Text(
+                        text = when (access?.mode) {
+                            EditionAccessMode.SUBSCRIPTION ->
+                                stringResource(R.string.open_subscription_offer)
+                            else -> stringResource(R.string.open_purchase_offer)
+                        },
+                    )
                 }
             } else {
                 Text(

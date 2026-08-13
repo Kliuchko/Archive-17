@@ -12,6 +12,7 @@ internal class FreeBookCatalogCache(context: Context) {
     private val gson = Gson()
 
     fun read(languageCode: String, page: Int): List<FreeBook> = runCatching {
+        if (page !in 1..MAX_CACHED_PAGES_PER_LANGUAGE) return emptyList()
         preferences.getString(cacheKey(languageCode, page), null)
             ?.let { gson.fromJson(it, CachedCatalogPage::class.java) }
             ?.books
@@ -24,7 +25,7 @@ internal class FreeBookCatalogCache(context: Context) {
     }
 
     fun write(languageCode: String, page: Int, books: List<FreeBook>, nowMillis: Long) {
-        if (books.isEmpty()) return
+        if (books.isEmpty() || page !in 1..MAX_CACHED_PAGES_PER_LANGUAGE) return
         preferences.edit()
             .putString(cacheKey(languageCode, page), gson.toJson(CachedCatalogPage(books)))
             .putLong(updatedAtKey(languageCode, page), nowMillis)
@@ -42,5 +43,6 @@ internal class FreeBookCatalogCache(context: Context) {
     private companion object {
         const val PREFERENCES_NAME = "free_book_catalog_cache_v4"
         const val CACHE_LIFETIME_MILLIS = 12L * 60L * 60L * 1000L
+        const val MAX_CACHED_PAGES_PER_LANGUAGE = 3
     }
 }

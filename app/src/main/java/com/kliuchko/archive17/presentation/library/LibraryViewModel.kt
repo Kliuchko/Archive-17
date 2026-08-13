@@ -67,10 +67,15 @@ class LibraryViewModel(
                     ) { books, localBooks -> books to localBooks }
                 }
                 .collectLatest { (books, localBooks) ->
+                    val locallyStoredWorkIds = localBooks.mapNotNullTo(mutableSetOf()) { book ->
+                        book.workId
+                    }
                     _uiState.update {
                         it.copy(
                             selectedFilter = selectedFilter.value,
-                            books = books,
+                            books = books.filterNot { book ->
+                                book.work.id in locallyStoredWorkIds
+                            },
                             localBooks = localBooks,
                             isLoading = false,
                         )

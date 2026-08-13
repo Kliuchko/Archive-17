@@ -15,11 +15,15 @@ import com.kliuchko.archive17.data.repository.WikidataBookQueryResolver
 import com.kliuchko.archive17.data.reader.ReadiumService
 import com.kliuchko.archive17.data.repository.DefaultLocalBookRepository
 import com.kliuchko.archive17.data.repository.DefaultLanguageSettingsRepository
+import com.kliuchko.archive17.data.repository.DefaultEditionSelectionRepository
+import com.kliuchko.archive17.data.repository.DefaultCommercialCatalogRepository
 import com.kliuchko.archive17.domain.repository.BookRepository
 import com.kliuchko.archive17.domain.repository.BookQueryResolver
 import com.kliuchko.archive17.domain.repository.FreeBookRepository
 import com.kliuchko.archive17.domain.repository.LocalBookRepository
 import com.kliuchko.archive17.domain.repository.LanguageSettingsRepository
+import com.kliuchko.archive17.domain.repository.EditionSelectionRepository
+import com.kliuchko.archive17.domain.repository.CommercialCatalogRepository
 import com.kliuchko.archive17.presentation.details.BookDetailsViewModel
 import com.kliuchko.archive17.presentation.freedetails.FreeBookDetailsViewModel
 import com.kliuchko.archive17.presentation.library.LibraryViewModel
@@ -27,6 +31,7 @@ import com.kliuchko.archive17.presentation.localdetails.LocalBookDetailsViewMode
 import com.kliuchko.archive17.presentation.search.SearchViewModel
 import com.kliuchko.archive17.presentation.profile.ProfileViewModel
 import okhttp3.OkHttpClient
+import okhttp3.Cache
 import okhttp3.logging.HttpLoggingInterceptor
 import org.koin.android.ext.koin.androidContext
 import org.koin.androidx.viewmodel.dsl.viewModel
@@ -47,6 +52,7 @@ val appModule = module {
                 Archive17Database.MIGRATION_1_2,
                 Archive17Database.MIGRATION_2_3,
                 Archive17Database.MIGRATION_3_4,
+                Archive17Database.MIGRATION_4_5,
             )
             .build()
     }
@@ -69,6 +75,12 @@ val appModule = module {
 
     single {
         OkHttpClient.Builder()
+            .cache(
+                Cache(
+                    directory = androidContext().cacheDir.resolve("catalog-http-cache"),
+                    maxSize = 20L * 1024L * 1024L,
+                ),
+            )
             .addInterceptor { chain ->
                 val request = chain.request().newBuilder()
                     .header("User-Agent", "Archive17/1.0 (+https://github.com/Kliuchko/Archive-17)")
@@ -148,6 +160,14 @@ val appModule = module {
         DefaultLanguageSettingsRepository(androidContext())
     }
 
+    single<EditionSelectionRepository> {
+        DefaultEditionSelectionRepository(androidContext())
+    }
+
+    single<CommercialCatalogRepository> {
+        DefaultCommercialCatalogRepository(providers = emptyList())
+    }
+
     single<FreeBookRepository> {
         DefaultFreeBookRepository(
             context = androidContext(),
@@ -157,6 +177,7 @@ val appModule = module {
             client = get(),
             localBookRepository = get(),
             queryResolver = get(),
+            editionSelectionRepository = get(),
         )
     }
 
@@ -175,6 +196,8 @@ val appModule = module {
             freeBookRepository = get(),
             languageSettingsRepository = get(),
             queryResolver = get(),
+            editionSelectionRepository = get(),
+            commercialCatalogRepository = get(),
         )
     }
 

@@ -30,6 +30,7 @@ import com.kliuchko.archive17.domain.repository.FreeBookRepository
 import com.kliuchko.archive17.domain.repository.BookQueryResolver
 import com.kliuchko.archive17.domain.repository.LocalBookRepository
 import com.kliuchko.archive17.domain.repository.RepositoryResult
+import com.kliuchko.archive17.domain.repository.EditionSelectionRepository
 import java.io.File
 import java.io.InputStream
 import java.util.UUID
@@ -53,6 +54,7 @@ class DefaultFreeBookRepository(
     private val client: OkHttpClient,
     private val localBookRepository: LocalBookRepository,
     private val queryResolver: BookQueryResolver,
+    private val editionSelectionRepository: EditionSelectionRepository,
 ) : FreeBookRepository {
     private val downloadDirectory = File(context.applicationContext.cacheDir, "free-book-downloads")
     private val temporaryReadingDirectory = File(
@@ -366,6 +368,7 @@ class DefaultFreeBookRepository(
 
     override suspend fun downloadToShelf(book: FreeBook): RepositoryResult<LocalBook> =
         withContext(Dispatchers.IO) {
+            editionSelectionRepository.selectEdition(book.workId, book.editionId)
             localBookRepository.getLocalBookByIdentifier(book.editionId)
                 ?.takeIf { saved -> File(saved.filePath).hasEpubSignature() }
                 ?.let { saved -> return@withContext RepositoryResult.Success(saved) }
@@ -381,6 +384,7 @@ class DefaultFreeBookRepository(
                 localBookRepository.importDownloadedBook(
                     sourceFilePath = temporaryFile.absolutePath,
                     metadata = DownloadedBookMetadata(
+                        workId = book.workId,
                         title = book.title,
                         author = book.authors.firstOrNull(),
                         identifier = book.editionId,
@@ -401,6 +405,7 @@ class DefaultFreeBookRepository(
     override suspend fun downloadForReading(
         book: FreeBook,
     ): RepositoryResult<TemporaryBook> = withContext(Dispatchers.IO) {
+        editionSelectionRepository.selectEdition(book.workId, book.editionId)
         temporaryReadingDirectory.mkdirs()
         val stableName = UUID.nameUUIDFromBytes(book.editionId.toByteArray()).toString()
         val cachedFile = File(temporaryReadingDirectory, "$stableName.epub")
@@ -478,13 +483,22 @@ class DefaultFreeBookRepository(
     )
 
     private fun cleanTemporaryReadingCache(except: File) {
-        temporaryReadingDirectory.listFiles()
+        val cachedBooks = temporaryReadingDirectory.listFiles()
             .orEmpty()
             .asSequence()
             .filter { it.extension.equals("epub", ignoreCase = true) && it != except }
             .sortedByDescending(File::lastModified)
-            .drop(MAX_TEMPORARY_BOOKS - 1)
-            .forEach(File::delete)
+            .toList()
+        var retainedBytes = except.length()
+        cachedBooks.forEachIndexed { index, file ->
+            val keepByCount = index < MAX_TEMPORARY_BOOKS - 1
+            val keepBySize = retainedBytes + file.length() <= MAX_TEMPORARY_CACHE_BYTES
+            if (keepByCount && keepBySize) {
+                retainedBytes += file.length()
+            } else {
+                file.delete()
+            }
+        }
     }
 
     private fun InputStream.copyToWithLimit(
@@ -636,7 +650,8 @@ class DefaultFreeBookRepository(
         const val MIN_SEARCH_QUERY_LENGTH = 2
         const val MAX_SOURCE_QUERIES = 3
         const val MAX_EPUB_BYTES = 50L * 1024L * 1024L
-        const val MAX_TEMPORARY_BOOKS = 4
+        const val MAX_TEMPORARY_BOOKS = 3
+        const val MAX_TEMPORARY_CACHE_BYTES = 80L * 1024L * 1024L
         const val TEMPORARY_READING_DIRECTORY = "temporary-reading"
         const val STARTER_CATALOG_QUERY = "subject:fiction"
         const val MAX_DETAIL_SUBJECTS = 6

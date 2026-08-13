@@ -161,7 +161,7 @@
     <string name="free_source">Open Library · Internet Archive</string>
     <string name="regional_rights_notice">Доступ отмечен источником как открытый. Права на конкретное издание могут зависеть от страны.</string>
     <string name="download_to_shelf">На Полку</string>
-    <string name="read_now">Читать сейчас</string>
+    <string name="read_now">Читать онлайн</string>
     <string name="opening_for_reading">Открываем…</string>
     <string name="downloading_book">Загружаем…</string>
     <string name="checking_epub">Проверяем EPUB…</string>
@@ -216,6 +216,10 @@
     <string name="edition_language_modern">современная орфография</string>
     <string name="edition_variants_available">Есть другие варианты текста</string>
     <string name="edition_original_language">Оригинал · %1$s</string>
+    <string name="edition_selected">Выбранное издание</string>
+    <string name="select_edition">Выбрать это издание</string>
+    <string name="open_purchase_offer">Перейти к покупке</string>
+    <string name="open_subscription_offer">Открыть предложение</string>
     <string name="access_label">Доступ</string>
     <string name="rights_basis_label">Основание доступа</string>
     <string name="rights_open_license">Открытая лицензия источника</string>

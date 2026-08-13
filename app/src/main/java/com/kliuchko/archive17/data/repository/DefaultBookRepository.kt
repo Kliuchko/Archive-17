@@ -90,6 +90,7 @@ class DefaultBookRepository(
                 .sortedWith(WORK_POPULARITY_ORDER)
 
             workDao.upsertWorks(works.map { it.toEntity(now) })
+            workDao.trimCatalogCache(MAX_CACHED_WORKS)
             RepositoryResult.Success(works)
         }
     }
@@ -100,6 +101,10 @@ class DefaultBookRepository(
         return workDao.getRecentWorks(CACHED_SEARCH_SCAN_LIMIT)
             .asSequence()
             .map(WorkEntity::toDomain)
+            .filter { work ->
+                val updatedAt = work.lastUpdatedAt ?: return@filter false
+                timeProvider.currentTimeMillis() - updatedAt <= SEARCH_CACHE_LIFETIME_MILLIS
+            }
             .filter { work ->
                 work.title.toCatalogSearchKey().contains(key) ||
                     work.authors.any { author -> author.toCatalogSearchKey().contains(key) }
@@ -113,6 +118,7 @@ class DefaultBookRepository(
         runRepositoryCatching(errorMessage = "Не удалось сохранить сведения каталога.") {
             val now = timeProvider.currentTimeMillis()
             workDao.upsertWorks(works.map { work -> work.toEntity(now) })
+            workDao.trimCatalogCache(MAX_CACHED_WORKS)
             RepositoryResult.Success(Unit)
         }
 
@@ -343,6 +349,8 @@ class DefaultBookRepository(
         const val DEFAULT_CACHE_FRESHNESS_MILLIS = 24L * 60L * 60L * 1000L
         private const val CACHED_SEARCH_SCAN_LIMIT = 200
         private const val CACHED_SEARCH_RESULT_LIMIT = 50
+        private const val MAX_CACHED_WORKS = 300
+        private const val SEARCH_CACHE_LIFETIME_MILLIS = 14L * 24L * 60L * 60L * 1000L
         private const val MAX_WORK_EDITION_RECORDS = 500
         private const val EDITION_LANGUAGE_REQUEST_CONCURRENCY = 2
         private val PRIORITY_EDITION_LANGUAGES = listOf(

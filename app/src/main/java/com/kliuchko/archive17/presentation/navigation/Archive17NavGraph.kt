@@ -168,6 +168,17 @@ fun Archive17App(
                     workId = workId,
                     onBackClick = navController::popBackStack,
                     onAuthorClick = navController::openCatalogSearch,
+                    onCommercialOfferClick = { offerUrl ->
+                        val uri = android.net.Uri.parse(offerUrl)
+                        if (uri.scheme == "https" || uri.scheme == "http") {
+                            context.startActivity(
+                                android.content.Intent(
+                                    android.content.Intent.ACTION_VIEW,
+                                    uri,
+                                ),
+                            )
+                        }
+                    },
                     onBookReady = { bookId ->
                         navController.navigate(Archive17Destination.LocalDetails.createRoute(bookId))
                     },

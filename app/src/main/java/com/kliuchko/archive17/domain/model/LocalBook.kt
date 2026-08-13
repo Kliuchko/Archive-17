@@ -2,6 +2,7 @@ package com.kliuchko.archive17.domain.model
 
 data class LocalBook(
     val id: String,
+    val workId: String? = null,
     val title: String,
     val author: String?,
     val identifier: String?,

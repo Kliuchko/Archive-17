@@ -110,6 +110,7 @@ data class TemporaryBook(
 )
 
 data class DownloadedBookMetadata(
+    val workId: String,
     val title: String,
     val author: String?,
     val identifier: String,

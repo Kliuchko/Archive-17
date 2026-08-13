@@ -10,12 +10,14 @@ import com.kliuchko.archive17.domain.model.ReadingStatus
     indices = [
         Index("readingStatus"),
         Index("updatedAt"),
+        Index("workId"),
         Index(value = ["contentHash"], unique = true),
     ],
 )
 data class LocalBookEntity(
     @PrimaryKey
     val id: String,
+    val workId: String?,
     val title: String,
     val author: String?,
     val identifier: String?,

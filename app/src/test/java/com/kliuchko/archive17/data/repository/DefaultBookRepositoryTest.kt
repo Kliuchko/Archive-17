@@ -350,6 +350,8 @@ private class FakeWorkDao : WorkDao {
         flowFor(workId).value = null
     }
 
+    override suspend fun trimCatalogCache(maxRecentWorks: Int) = Unit
+
     fun getStored(workId: String): WorkEntity? = works[workId]
 
     private fun flowFor(workId: String): MutableStateFlow<WorkEntity?> =

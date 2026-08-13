@@ -25,4 +25,16 @@ interface WorkDao {
 
     @Query("DELETE FROM works WHERE id = :workId")
     suspend fun deleteWork(workId: String)
+
+    @Query(
+        """
+        DELETE FROM works
+        WHERE id NOT IN (SELECT workId FROM library_entries)
+          AND id NOT IN (SELECT workId FROM local_books WHERE workId IS NOT NULL)
+          AND id NOT IN (
+              SELECT id FROM works ORDER BY lastUpdatedAt DESC LIMIT :maxRecentWorks
+          )
+        """,
+    )
+    suspend fun trimCatalogCache(maxRecentWorks: Int)
 }

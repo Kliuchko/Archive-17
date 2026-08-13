@@ -2,6 +2,8 @@ package com.kliuchko.archive17.presentation.details
 
 import com.kliuchko.archive17.domain.model.ReadingStatus
 import com.kliuchko.archive17.domain.model.Work
+import com.kliuchko.archive17.domain.model.FreeBook
+import com.kliuchko.archive17.domain.model.toPublicationEdition
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -56,6 +58,31 @@ class BookDetailsUiStateTest {
         assertEquals("Читаю", ReadingStatus.READING.displayName())
         assertEquals("Прочитано", ReadingStatus.FINISHED.displayName())
     }
+
+    @Test
+    fun `preferred free edition follows saved selection`() {
+        val russian = freeBook("ru-edition", "rus")
+        val english = freeBook("en-edition", "eng")
+        val state = BookDetailsUiState(
+            workId = "OL1W",
+            selectedEditionId = russian.editionId,
+            freeBooksByEditionId = listOf(english, russian).associateBy(FreeBook::editionId),
+            editions = listOf(english, russian).map { it.toPublicationEdition() },
+        )
+
+        assertEquals("ru-edition", state.preferredFreeBook?.editionId)
+    }
+
+    private fun freeBook(id: String, language: String) = FreeBook(
+        workId = "OL1W",
+        editionId = id,
+        title = "Book",
+        authors = listOf("Author"),
+        coverId = null,
+        firstPublishYear = 2001,
+        languageCode = language,
+        epubDownloadUrl = "https://example.com/$id.epub",
+    )
 
     private fun sampleWork(
         editionLanguages: List<String> = listOf("eng"),

@@ -13,6 +13,10 @@ import com.kliuchko.archive17.domain.repository.BookQueryResolver
 import com.kliuchko.archive17.domain.repository.FreeBookRepository
 import com.kliuchko.archive17.domain.repository.LanguageSettingsRepository
 import com.kliuchko.archive17.domain.repository.RepositoryResult
+import com.kliuchko.archive17.domain.repository.EditionSelectionRepository
+import com.kliuchko.archive17.domain.repository.CommercialCatalogRepository
+import com.kliuchko.archive17.domain.model.CommercialCatalogRequest
+import com.kliuchko.archive17.domain.model.CommercialBookOffer
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -29,6 +33,8 @@ class BookDetailsViewModel(
     private val freeBookRepository: FreeBookRepository,
     private val languageSettingsRepository: LanguageSettingsRepository,
     private val queryResolver: BookQueryResolver,
+    private val editionSelectionRepository: EditionSelectionRepository,
+    private val commercialCatalogRepository: CommercialCatalogRepository,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(BookDetailsUiState(workId = workId))
     val uiState: StateFlow<BookDetailsUiState> = _uiState.asStateFlow()
@@ -133,6 +139,7 @@ class BookDetailsViewModel(
             return
         }
         viewModelScope.launch {
+            selectEdition(book.editionId)
             _uiState.update { it.copy(readingEditionId = book.editionId, message = null) }
             when (val result = freeBookRepository.downloadForReading(book)) {
                 is RepositoryResult.Success -> _uiState.update {
@@ -153,10 +160,20 @@ class BookDetailsViewModel(
             return
         }
         viewModelScope.launch {
+            selectEdition(book.editionId)
             _uiState.update { it.copy(downloadingEditionId = book.editionId, message = null) }
             when (val result = freeBookRepository.downloadToShelf(book)) {
-                is RepositoryResult.Success -> _uiState.update {
-                    it.copy(downloadingEditionId = null, downloadedBookId = result.data.id)
+                is RepositoryResult.Success -> {
+                    uiState.value.work?.let { work ->
+                        repository.saveWorkToLibrary(
+                            work = work,
+                            readingStatus = uiState.value.selectedStatus
+                                ?: ReadingStatus.WANT_TO_READ,
+                        )
+                    }
+                    _uiState.update {
+                        it.copy(downloadingEditionId = null, downloadedBookId = result.data.id)
+                    }
                 }
                 is RepositoryResult.Cached -> _uiState.update {
                     it.copy(downloadingEditionId = null, message = result.message)
@@ -178,6 +195,11 @@ class BookDetailsViewModel(
 
     fun showAllEditionVariants() {
         _uiState.update { it.copy(showAllEditionVariants = true) }
+    }
+
+    fun selectEdition(editionId: String) {
+        editionSelectionRepository.selectEdition(workId, editionId)
+        _uiState.update { it.copy(selectedEditionId = editionId) }
     }
 
     private fun observeDetails() {
@@ -215,7 +237,7 @@ class BookDetailsViewModel(
                 languageCodes = work.editionLanguages,
             )
             val resolvedOriginalLanguageCode = translationMetadata.originalLanguageCode
-            val (metadataResult, freeResult) = coroutineScope {
+            val (metadataResult, freeResult, commercialResult) = coroutineScope {
                 val metadata = async {
                     repository.getPublicationEditions(
                         work = work,
@@ -227,20 +249,35 @@ class BookDetailsViewModel(
                 val free = async {
                     loadFreeEditions(work.title, work.id, preferredBookLanguageCode)
                 }
-                metadata.await() to free.await()
+                val commercial = async {
+                    commercialCatalogRepository.findOffers(
+                        CommercialCatalogRequest(
+                            workId = work.id,
+                            title = work.title,
+                            authors = work.authors,
+                            preferredLanguageCode = deviceLanguageCode,
+                            territoryCode = deviceTerritoryCode(),
+                        ),
+                    )
+                }
+                Triple(metadata.await(), free.await(), commercial.await())
             }
             val metadata = metadataResult.dataOrEmpty()
             val freeBooks = freeResult
             val freeEditions = freeBooks.map(FreeBook::toPublicationEdition)
+            val commercialEditions = commercialResult.dataOrEmpty()
+                .map(CommercialBookOffer::toPublicationEdition)
             val originalLanguageCode = resolvedOriginalLanguageCode
                 ?: inferOriginalLanguage(work, freeEditions + metadata)
-            val editions = (freeEditions + metadata)
+            val editions = (freeEditions + commercialEditions + metadata)
                 .distinctBy(PublicationEdition::id)
                 .groupMeaningfulVariants(deviceLanguageCode, originalLanguageCode)
             _uiState.update {
                 it.copy(
                     editions = editions,
                     originalLanguageCode = originalLanguageCode,
+                    selectedEditionId = editionSelectionRepository.selectedEditionId(work.id)
+                        ?: it.selectedEditionId,
                     freeBooksByEditionId = freeBooks.associateBy(FreeBook::editionId),
                     isLoadingEditions = false,
                     isEnrichingEditions = true,
@@ -299,6 +336,11 @@ class BookDetailsViewModel(
         val locale = Resources.getSystem().configuration.locales[0] ?: Locale.ENGLISH
         locale.isO3Language.toOpenLibraryLanguageCode()
     }.getOrDefault("eng")
+
+    private fun deviceTerritoryCode(): String = runCatching {
+        val locale = Resources.getSystem().configuration.locales[0] ?: Locale.getDefault()
+        locale.country.uppercase(Locale.ROOT).takeIf(String::isNotBlank) ?: "ZZ"
+    }.getOrDefault("ZZ")
 
     private fun String.toOpenLibraryLanguageCode(): String = when (this) {
         "deu" -> "ger"
