@@ -3,6 +3,8 @@ package com.kliuchko.archive17.data.networking.mapper
 import com.kliuchko.archive17.domain.model.FreeBook
 import com.kliuchko.archive17.domain.model.FreeBookDetails
 import com.kliuchko.archive17.domain.model.FreeBookSource
+import com.kliuchko.archive17.domain.model.FreeBookRights
+import com.kliuchko.archive17.domain.model.FreeAccessBasis
 import java.text.Normalizer
 import java.util.Locale
 import okhttp3.HttpUrl
@@ -47,6 +49,7 @@ private fun AuthorizedBook.toFreeBook() = FreeBook(
     source = FreeBookSource.AUTHORIZED_PUBLISHER,
     sourcePageUrl = sourcePageUrl,
     epubDownloadUrl = epubDownloadUrl,
+    rights = FreeBookRights(FreeAccessBasis.RIGHTS_HOLDER_PERMISSION),
 )
 
 private fun String.toSearchKey(): String = Normalizer.normalize(this, Normalizer.Form.NFKD)

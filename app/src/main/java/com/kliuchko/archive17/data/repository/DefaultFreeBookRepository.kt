@@ -2,6 +2,7 @@ package com.kliuchko.archive17.data.repository
 
 import android.content.Context
 import com.kliuchko.archive17.data.networking.CoverMatchEnricher
+import com.kliuchko.archive17.data.networking.FreeBookMetadataMerger
 import com.kliuchko.archive17.data.networking.api.InternetArchiveApi
 import com.kliuchko.archive17.data.networking.api.OpenLibraryApi
 import com.kliuchko.archive17.data.networking.api.WikisourceApi
@@ -57,6 +58,7 @@ class DefaultFreeBookRepository(
     private val booksByEditionId = ConcurrentHashMap<String, FreeBook>()
     private val catalogCache = FreeBookCatalogCache(context)
     private val coverMatchEnricher = CoverMatchEnricher()
+    private val metadataMerger = FreeBookMetadataMerger(queryResolver, coverMatchEnricher)
 
     override suspend fun searchBooks(
         query: String,
@@ -96,16 +98,30 @@ class DefaultFreeBookRepository(
         val resolvedQueries = queryResolver.resolve(normalizedQuery, languageCode)
             .ifEmpty { listOf(normalizedQuery) }
             .take(MAX_SOURCE_QUERIES)
-        val (openLibraryResult, primarySourceResult) = coroutineScope {
+        val englishAlternativeQuery = if (languageCode != ENGLISH_LANGUAGE && page == 1) {
+            resolvedQueries.firstOrNull { query -> query.containsLatinLetters() }
+        } else {
+            null
+        }
+        val (openLibraryResult, primarySourceResult, alternativeLanguageResult) = coroutineScope {
             val openLibrary = async {
                 fetchBooksSafely {
                     fetchOpenLibraryBooks(resolvedQueries, languageCode, page)
                 }
             }
             val primarySource = async {
-                fetchBooksSafely { searchPrimarySourceBooks(normalizedQuery, languageCode, page) }
+                fetchBooksSafely {
+                    searchPrimarySourceBooks(resolvedQueries, languageCode, page)
+                }
             }
-            openLibrary.await() to primarySource.await()
+            val alternativeLanguage = async {
+                englishAlternativeQuery?.let { query ->
+                    fetchBooksSafely {
+                        fetchOpenLibraryBooks(query, ENGLISH_LANGUAGE, page)
+                    }
+                } ?: (emptyList<FreeBook>() to null)
+            }
+            Triple(openLibrary.await(), primarySource.await(), alternativeLanguage.await())
         }
         val (openLibraryBooks, openLibraryError) = openLibraryResult
         val (primarySourceBooks, primarySourceError) = primarySourceResult
@@ -113,7 +129,11 @@ class DefaultFreeBookRepository(
         return if (openLibraryError != null && primarySourceError != null) {
             RepositoryResult.Error("Не удалось найти бесплатные книги.")
         } else {
-            val books = combineCatalogBooks(primarySourceBooks, openLibraryBooks)
+            val alternativeLanguageBooks = alternativeLanguageResult.first
+            val books = combineCatalogBooks(
+                primarySourceBooks,
+                openLibraryBooks + alternativeLanguageBooks,
+            )
             books.forEach { book -> booksByEditionId[book.editionId] = book }
             RepositoryResult.Success(books)
         }
@@ -241,10 +261,8 @@ class DefaultFreeBookRepository(
 
         return try {
             val identifierQuery = identifiers.joinToString(separator = " OR ")
-            val languageQuery = languageCode.toInternetArchiveLanguageQuery()
             val response = internetArchiveApi.findEpubIdentifiers(
-                query = "identifier:($identifierQuery) AND format:(EPUB OR EPUB3) " +
-                    "AND language:($languageQuery)",
+                query = "identifier:($identifierQuery) AND format:(EPUB OR EPUB3)",
                 rows = identifiers.size,
             )
             val downloadableIdentifiers = response.response.docs
@@ -434,16 +452,30 @@ class DefaultFreeBookRepository(
         else -> emptyList()
     }
 
+    private suspend fun searchPrimarySourceBooks(
+        queries: List<String>,
+        languageCode: String,
+        page: Int,
+    ): List<FreeBook> = coroutineScope {
+        val results = queries.map { query ->
+            async { fetchBooksSafely { searchPrimarySourceBooks(query, languageCode, page) } }
+        }.awaitAll()
+        if (results.all { (_, error) -> error != null }) {
+            throw results.firstNotNullOf { (_, error) -> error }
+        }
+        results.flatMap { (books, _) -> books }.distinctBy(FreeBook::editionId)
+    }
+
     private suspend fun fetchOpenLibraryBooks(
         query: String,
         languageCode: String,
         page: Int,
     ): List<FreeBook> {
         val catalogQuery = query.ifBlank { STARTER_CATALOG_QUERY }
-        val searchQuery = "$catalogQuery ebook_access:public language:$languageCode"
         return openLibraryApi.searchFreeBooks(
-            query = searchQuery,
-            language = languageCode.toIso6391(),
+            query = catalogQuery,
+            language = languageCode,
+            responseLanguage = languageCode.toIso6391(),
             page = page.coerceAtLeast(1),
         ).toFreeBooks(expectedLanguageCode = languageCode)
     }
@@ -511,12 +543,10 @@ class DefaultFreeBookRepository(
         }
     }
 
-    private fun combineCatalogBooks(
+    private suspend fun combineCatalogBooks(
         primary: List<FreeBook>,
         secondary: List<FreeBook>,
-    ): List<FreeBook> = coverMatchEnricher
-        .enrichFreeBooks(interleaveBooks(primary, secondary))
-        .distinctBy(FreeBook::catalogTitleKey)
+    ): List<FreeBook> = metadataMerger.merge(interleaveBooks(primary, secondary))
 
     private fun String.toIso6391(): String = when (this) {
         "rus" -> "ru"
@@ -529,16 +559,7 @@ class DefaultFreeBookRepository(
         else -> take(2)
     }
 
-    private fun String.toInternetArchiveLanguageQuery(): String = when (this) {
-        "rus" -> "rus OR Russian"
-        "eng" -> "eng OR English"
-        "ukr" -> "ukr OR Ukrainian"
-        "ita" -> "ita OR Italian"
-        "ger" -> "ger OR German"
-        "fre" -> "fre OR French"
-        "spa" -> "spa OR Spanish"
-        else -> this
-    }
+    private fun String.containsLatinLetters(): Boolean = any { it in 'A'..'Z' || it in 'a'..'z' }
 
     private fun com.kliuchko.archive17.data.networking.dto.InternetArchiveFilesDto
         .selectDownloadableEpub(): InternetArchiveFileDto? = result

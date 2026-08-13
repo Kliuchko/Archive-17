@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.kliuchko.archive17.domain.model.BookLanguage
 import com.kliuchko.archive17.domain.model.FreeBook
+import com.kliuchko.archive17.domain.model.TextEditionType
 import com.kliuchko.archive17.domain.model.Work
 import com.kliuchko.archive17.domain.repository.BookRepository
 import com.kliuchko.archive17.domain.repository.FreeBookRepository
@@ -71,6 +72,20 @@ class SearchViewModel(
                 } else {
                     it.freeBooks
                 },
+                alternativeEditionBooks = if (
+                    normalizedLength in 1 until SearchUiState.MIN_QUERY_LENGTH
+                ) {
+                    emptyList()
+                } else {
+                    it.alternativeEditionBooks
+                },
+                otherLanguageBooks = if (
+                    normalizedLength in 1 until SearchUiState.MIN_QUERY_LENGTH
+                ) {
+                    emptyList()
+                } else {
+                    it.otherLanguageBooks
+                },
                 otherFreeBooks = if (normalizedLength in 1 until SearchUiState.MIN_QUERY_LENGTH) {
                     emptyList()
                 } else {
@@ -101,6 +116,8 @@ class SearchViewModel(
                 nextPageError = null,
                 books = emptyList(),
                 freeBooks = emptyList(),
+                alternativeEditionBooks = emptyList(),
+                otherLanguageBooks = emptyList(),
                 otherFreeBooks = emptyList(),
                 errorMessage = null,
                 actionMessage = null,
@@ -215,6 +232,8 @@ class SearchViewModel(
                     nextPageError = null,
                     books = emptyList(),
                     freeBooks = emptyList(),
+                    alternativeEditionBooks = emptyList(),
+                    otherLanguageBooks = emptyList(),
                     otherFreeBooks = emptyList(),
                     errorMessage = null,
                     actionMessage = null,
@@ -238,6 +257,8 @@ class SearchViewModel(
                 actionMessage = null,
                 books = emptyList(),
                 freeBooks = emptyList(),
+                alternativeEditionBooks = emptyList(),
+                otherLanguageBooks = emptyList(),
                 otherFreeBooks = emptyList(),
                 isFreeCatalogFallback = false,
                 selectedMode = request.mode,
@@ -295,6 +316,8 @@ class SearchViewModel(
                 canLoadMore = false,
                 books = books,
                 freeBooks = emptyList(),
+                alternativeEditionBooks = emptyList(),
+                otherLanguageBooks = emptyList(),
                 otherFreeBooks = emptyList(),
                 errorMessage = null,
                 actionMessage = null,
@@ -345,6 +368,8 @@ class SearchViewModel(
                     isCheckingFreeBooks = false,
                     canLoadMore = false,
                     freeBooks = emptyList(),
+                    alternativeEditionBooks = emptyList(),
+                    otherLanguageBooks = emptyList(),
                     otherFreeBooks = emptyList(),
                 )
             }
@@ -358,21 +383,25 @@ class SearchViewModel(
             )
         ) {
             is RepositoryResult.Success -> _uiState.update {
-                val verifiedIds = availability.data.mapTo(mutableSetOf(), FreeBook::editionId)
+                val classified = candidates.classify(availability.data, languageCode)
                 it.copy(
                     isLoading = false,
                     isCheckingFreeBooks = false,
-                    freeBooks = availability.data,
-                    otherFreeBooks = candidates.filterNot { book -> book.editionId in verifiedIds },
+                    freeBooks = classified.verified,
+                    alternativeEditionBooks = classified.alternatives,
+                    otherLanguageBooks = classified.otherLanguages,
+                    otherFreeBooks = classified.other,
                 )
             }
             is RepositoryResult.Cached -> _uiState.update {
-                val verifiedIds = availability.data.mapTo(mutableSetOf(), FreeBook::editionId)
+                val classified = candidates.classify(availability.data, languageCode)
                 it.copy(
                     isLoading = false,
                     isCheckingFreeBooks = false,
-                    freeBooks = availability.data,
-                    otherFreeBooks = candidates.filterNot { book -> book.editionId in verifiedIds },
+                    freeBooks = classified.verified,
+                    alternativeEditionBooks = classified.alternatives,
+                    otherLanguageBooks = classified.otherLanguages,
+                    otherFreeBooks = classified.other,
                     actionMessage = availability.message,
                 )
             }
@@ -381,6 +410,8 @@ class SearchViewModel(
                     isLoading = false,
                     isCheckingFreeBooks = false,
                     freeBooks = emptyList(),
+                    alternativeEditionBooks = emptyList(),
+                    otherLanguageBooks = emptyList(),
                     otherFreeBooks = candidates,
                     actionMessage = availability.message,
                 )
@@ -403,8 +434,8 @@ class SearchViewModel(
         val classified = when (
             val availability = freeBookRepository.keepDownloadableBooks(candidates, languageCode)
         ) {
-            is RepositoryResult.Success -> candidates.classify(availability.data)
-            is RepositoryResult.Cached -> candidates.classify(availability.data)
+            is RepositoryResult.Success -> candidates.classify(availability.data, languageCode)
+            is RepositoryResult.Cached -> candidates.classify(availability.data, languageCode)
             is RepositoryResult.Error -> ClassifiedFreeBooks(other = candidates)
         }
         return FreeCatalogPageResult.Success(
@@ -413,11 +444,25 @@ class SearchViewModel(
         )
     }
 
-    private fun List<FreeBook>.classify(verified: List<FreeBook>): ClassifiedFreeBooks {
+    private fun List<FreeBook>.classify(
+        verified: List<FreeBook>,
+        selectedLanguageCode: String,
+    ): ClassifiedFreeBooks {
         val verifiedIds = verified.mapTo(mutableSetOf(), FreeBook::editionId)
+        val groupedSelected = verified
+            .filter { it.languageCode == selectedLanguageCode }
+            .distinctBy(FreeBook::editionId)
+            .groupBy(FreeBook::catalogTitleKey)
+            .values
+            .map { editions -> editions.sortedWith(EDITION_PREFERENCE) }
         return ClassifiedFreeBooks(
-            verified = verified,
-            other = filterNot { it.editionId in verifiedIds },
+            verified = groupedSelected.mapNotNull(List<FreeBook>::firstOrNull),
+            alternatives = groupedSelected.flatMap { it.drop(1) },
+            otherLanguages = verified
+                .filter { it.languageCode != selectedLanguageCode }
+                .distinctBy(FreeBook::editionId)
+                .sortedWith(EDITION_PREFERENCE),
+            other = filterNot { it.editionId in verifiedIds }.distinctBy(FreeBook::editionId),
         )
     }
 
@@ -455,6 +500,8 @@ class SearchViewModel(
                 isLoadingNextPage = false,
                 books = books,
                 freeBooks = emptyList(),
+                alternativeEditionBooks = emptyList(),
+                otherLanguageBooks = emptyList(),
                 otherFreeBooks = emptyList(),
                 errorMessage = null,
                 actionMessage = notice,
@@ -474,6 +521,8 @@ class SearchViewModel(
                 nextPageError = null,
                 books = emptyList(),
                 freeBooks = emptyList(),
+                alternativeEditionBooks = emptyList(),
+                otherLanguageBooks = emptyList(),
                 otherFreeBooks = emptyList(),
                 errorMessage = message,
                 actionMessage = null,
@@ -555,6 +604,8 @@ class SearchViewModel(
 
     private data class ClassifiedFreeBooks(
         val verified: List<FreeBook> = emptyList(),
+        val alternatives: List<FreeBook> = emptyList(),
+        val otherLanguages: List<FreeBook> = emptyList(),
         val other: List<FreeBook> = emptyList(),
     )
 
@@ -571,15 +622,27 @@ class SearchViewModel(
         page: ClassifiedFreeBooks,
         hasMore: Boolean,
     ): SearchUiState {
-        val verified = (freeBooks + page.verified).distinctBy(FreeBook::catalogTitleKey)
-        val verifiedIds = verified.mapTo(mutableSetOf(), FreeBook::editionId)
-        val verifiedTitles = verified.mapTo(mutableSetOf(), FreeBook::catalogTitleKey)
+        val selectedEditions = (
+            freeBooks + alternativeEditionBooks + page.verified + page.alternatives
+            )
+            .distinctBy(FreeBook::editionId)
+            .groupBy(FreeBook::catalogTitleKey)
+            .values
+            .map { editions -> editions.sortedWith(EDITION_PREFERENCE) }
+        val verified = selectedEditions.mapNotNull(List<FreeBook>::firstOrNull)
+        val alternatives = selectedEditions.flatMap { it.drop(1) }
+        val otherLanguages = (otherLanguageBooks + page.otherLanguages)
+            .distinctBy(FreeBook::editionId)
+            .sortedWith(EDITION_PREFERENCE)
+        val verifiedIds = (verified + alternatives + otherLanguages)
+            .mapTo(mutableSetOf(), FreeBook::editionId)
         val other = (otherFreeBooks + page.other)
-            .distinctBy(FreeBook::catalogTitleKey)
+            .distinctBy(FreeBook::editionId)
             .filterNot { it.editionId in verifiedIds }
-            .filterNot { it.catalogTitleKey in verifiedTitles }
         return copy(
             freeBooks = verified,
+            alternativeEditionBooks = alternatives,
+            otherLanguageBooks = otherLanguages,
             otherFreeBooks = other,
             isLoadingNextPage = false,
             canLoadMore = hasMore,
@@ -595,4 +658,12 @@ class SearchViewModel(
             systemLocale.isO3Language
         }.getOrDefault("eng")
     }
+
+    private val EDITION_PREFERENCE = compareByDescending<FreeBook> { book ->
+        when (book.textEditionType) {
+            TextEditionType.MODERN_ORTHOGRAPHY -> 3
+            TextEditionType.UNSPECIFIED -> 2
+            TextEditionType.HISTORICAL_ORTHOGRAPHY -> 1
+        }
+    }.thenByDescending { it.coverId != null || !it.coverUrl.isNullOrBlank() }
 }

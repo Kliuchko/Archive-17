@@ -18,6 +18,8 @@ data class SearchUiState(
     val nextPageError: String? = null,
     val books: List<Work> = emptyList(),
     val freeBooks: List<FreeBook> = emptyList(),
+    val alternativeEditionBooks: List<FreeBook> = emptyList(),
+    val otherLanguageBooks: List<FreeBook> = emptyList(),
     val otherFreeBooks: List<FreeBook> = emptyList(),
     val selectedMode: CatalogMode = CatalogMode.FREE,
     val bookLanguageCode: String = "eng",
@@ -39,6 +41,8 @@ data class SearchUiState(
             errorMessage == null &&
             books.isEmpty() &&
             freeBooks.isEmpty() &&
+            alternativeEditionBooks.isEmpty() &&
+            otherLanguageBooks.isEmpty() &&
             otherFreeBooks.isEmpty()
 
     companion object {

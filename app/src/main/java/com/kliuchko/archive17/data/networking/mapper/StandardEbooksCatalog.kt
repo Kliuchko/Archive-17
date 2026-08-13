@@ -3,6 +3,8 @@ package com.kliuchko.archive17.data.networking.mapper
 import com.kliuchko.archive17.domain.model.FreeBook
 import com.kliuchko.archive17.domain.model.FreeBookDetails
 import com.kliuchko.archive17.domain.model.FreeBookSource
+import com.kliuchko.archive17.domain.model.FreeBookRights
+import com.kliuchko.archive17.domain.model.FreeAccessBasis
 
 fun curatedEnglishStandardEbooks(
     query: String,
@@ -46,6 +48,11 @@ private fun StandardEbook.toFreeBook(): FreeBook {
         source = FreeBookSource.STANDARD_EBOOKS,
         sourcePageUrl = pageUrl,
         epubDownloadUrl = "$pageUrl/downloads/$fileSlug.epub?source=download",
+        rights = FreeBookRights(
+            basis = FreeAccessBasis.PUBLIC_DOMAIN_US,
+            licenseUrl = "https://creativecommons.org/publicdomain/zero/1.0/",
+            territoryCodes = listOf("US"),
+        ),
     )
 }
 

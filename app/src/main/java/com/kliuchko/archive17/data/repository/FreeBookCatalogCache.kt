@@ -40,7 +40,7 @@ internal class FreeBookCatalogCache(context: Context) {
     private data class CachedCatalogPage(val books: List<FreeBook>)
 
     private companion object {
-        const val PREFERENCES_NAME = "free_book_catalog_cache"
+        const val PREFERENCES_NAME = "free_book_catalog_cache_v3"
         const val CACHE_LIFETIME_MILLIS = 12L * 60L * 60L * 1000L
     }
 }

@@ -183,6 +183,19 @@
     <string name="other_open_editions_body">Источник отмечает их как открытые. Подходящий EPUB для Полки пока не подтверждён, но книгу можно проверить у источника.</string>
     <string name="epub_not_confirmed_short">EPUB для Полки пока не подтверждён</string>
     <string name="epub_not_confirmed_details">Источник отмечает издание как открытое, но Archive 17 пока не подтвердил EPUB подходящего языка и размера. Книгу можно открыть на странице источника.</string>
+    <string name="alternative_editions">Другие версии</string>
+    <string name="alternative_editions_body">Другие переводы и редакции этого произведения. Они не потеряны — выберите подходящую версию.</string>
+    <string name="other_language_editions">Издания на других языках</string>
+    <string name="other_language_editions_body">Если подходящего перевода пока нет, можно читать доступный оригинал или другое открытое издание.</string>
+    <string name="historical_orthography_warning">Дореформенная орфография</string>
+    <string name="modern_orthography">Современная орфография</string>
+    <string name="edition_type_label">Версия текста</string>
+    <string name="edition_details_label">Издание</string>
     <string name="access_label">Доступ</string>
+    <string name="rights_basis_label">Основание доступа</string>
+    <string name="rights_open_license">Открытая лицензия источника</string>
+    <string name="rights_holder_permission">Разрешено правообладателем</string>
+    <string name="rights_public_domain_us">Общественное достояние в США; проверьте правила своей страны</string>
+    <string name="rights_source_reported_public">Источник сообщает об открытом доступе</string>
     <string name="book_language_label">Язык книги</string>
 </resources>

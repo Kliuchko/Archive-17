@@ -47,6 +47,7 @@ class WikidataBookQueryResolver(
                         original = original,
                         candidateIds = candidateIds,
                         entities = entities.entities,
+                        preferredLanguageCode = preferredLanguageCode,
                     )
                 }
             } catch (exception: Throwable) {
@@ -124,12 +125,32 @@ internal fun buildResolvedBookQueries(
     original: String,
     candidateIds: List<String>,
     entities: Map<String, WikidataEntityDto>,
+    preferredLanguageCode: String? = null,
 ): List<String> = buildList {
     add(original)
     val candidates = candidateIds.mapNotNull(entities::get)
-    PREFERRED_LABEL_LANGUAGES.forEach { language ->
+    val preferredLanguage = preferredLanguageCode?.toIso6391()
+    val priorityLanguages = listOfNotNull(preferredLanguage, "en").distinct()
+    priorityLanguages.forEach { language ->
         candidates.forEach { entity ->
             entity.labels[language]?.value?.takeIf(String::isNotBlank)?.let(::add)
+        }
+    }
+    priorityLanguages.forEach { language ->
+        candidates.forEach { entity ->
+            entity.aliases[language].orEmpty().forEach { alias ->
+                alias.value?.takeIf(String::isNotBlank)?.let(::add)
+            }
+        }
+    }
+    PREFERRED_LABEL_LANGUAGES.filterNot(priorityLanguages::contains).forEach { language ->
+        candidates.forEach { entity ->
+            entity.labels[language]?.value?.takeIf(String::isNotBlank)?.let(::add)
+        }
+        candidates.forEach { entity ->
+            entity.aliases[language].orEmpty().forEach { alias ->
+                alias.value?.takeIf(String::isNotBlank)?.let(::add)
+            }
         }
     }
     candidates.forEach { entity ->

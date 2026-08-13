@@ -26,6 +26,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.kliuchko.archive17.R
+import com.kliuchko.archive17.domain.model.FreeAccessBasis
+import com.kliuchko.archive17.domain.model.TextEditionType
 import com.kliuchko.archive17.domain.model.TemporaryBook
 import com.kliuchko.archive17.presentation.components.FreeBookCover
 import org.koin.androidx.compose.koinViewModel
@@ -137,6 +139,24 @@ fun FreeBookDetailsScreen(
                     label = stringResource(R.string.edition_language_label),
                     value = localizedBookLanguage(book.languageCode),
                 )
+                if (book.textEditionType != TextEditionType.UNSPECIFIED) {
+                    DetailFact(
+                        label = stringResource(R.string.edition_type_label),
+                        value = stringResource(
+                            if (book.textEditionType == TextEditionType.HISTORICAL_ORTHOGRAPHY) {
+                                R.string.historical_orthography_warning
+                            } else {
+                                R.string.modern_orthography
+                            },
+                        ),
+                    )
+                }
+                book.editionLabel?.let { label ->
+                    DetailFact(
+                        label = stringResource(R.string.edition_details_label),
+                        value = label,
+                    )
+                }
                 Text(
                     text = stringResource(R.string.catalog_language_scope),
                     style = MaterialTheme.typography.bodySmall,
@@ -151,6 +171,10 @@ fun FreeBookDetailsScreen(
                             R.string.open_edition
                         },
                     ),
+                )
+                DetailFact(
+                    label = stringResource(R.string.rights_basis_label),
+                    value = stringResource(book.rights.basis.labelResource()),
                 )
 
                 if (book.isDownloadable) {
@@ -280,4 +304,11 @@ private fun formatFileSize(bytes: Long): String {
     } else {
         "%.1f MB".format(megabytes)
     }
+}
+
+private fun FreeAccessBasis.labelResource(): Int = when (this) {
+    FreeAccessBasis.OPEN_LICENSE -> R.string.rights_open_license
+    FreeAccessBasis.RIGHTS_HOLDER_PERMISSION -> R.string.rights_holder_permission
+    FreeAccessBasis.PUBLIC_DOMAIN_US -> R.string.rights_public_domain_us
+    FreeAccessBasis.SOURCE_REPORTED_PUBLIC -> R.string.rights_source_reported_public
 }

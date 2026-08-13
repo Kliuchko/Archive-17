@@ -21,7 +21,9 @@ interface OpenLibraryApi {
         @Query("fields") fields: String = FREE_SEARCH_FIELDS,
         @Query("limit") limit: Int = FREE_SEARCH_LIMIT,
         @Query("page") page: Int = 1,
-        @Query("lang") language: String,
+        @Query("language") language: String,
+        @Query("ebook_access") ebookAccess: String = "public",
+        @Query("lang") responseLanguage: String,
     ): OpenLibrarySearchResponseDto
 
     @GET("works/{workId}.json")

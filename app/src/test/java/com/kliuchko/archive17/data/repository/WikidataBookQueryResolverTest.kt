@@ -94,6 +94,31 @@ class WikidataBookQueryResolverTest {
         )
     }
 
+    @Test
+    fun `selected catalog language keeps its label and alias in source query budget`() {
+        val queries = buildResolvedBookQueries(
+            original = "Oliver Twist",
+            candidateIds = listOf("Q164974"),
+            entities = mapOf(
+                "Q164974" to WikidataEntityDto(
+                    labels = mapOf(
+                        "en" to term("en", "Oliver Twist"),
+                        "ru" to term("ru", "Приключения Оливера Твиста"),
+                    ),
+                    aliases = mapOf(
+                        "ru" to listOf(term("ru", "Оливер Твист")),
+                    ),
+                ),
+            ),
+            preferredLanguageCode = "rus",
+        )
+
+        assertEquals(
+            listOf("Oliver Twist", "Приключения Оливера Твиста", "Оливер Твист"),
+            queries.take(3),
+        )
+    }
+
     private fun searchItem(id: String, label: String, description: String) =
         WikidataSearchItemDto(
             id = id,

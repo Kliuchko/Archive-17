@@ -42,6 +42,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.kliuchko.archive17.R
 import com.kliuchko.archive17.domain.model.Work
 import com.kliuchko.archive17.domain.model.FreeBook
+import com.kliuchko.archive17.domain.model.TextEditionType
 import com.kliuchko.archive17.domain.model.TemporaryBook
 import com.kliuchko.archive17.presentation.components.ArchiveBrand
 import com.kliuchko.archive17.presentation.components.BookCover
@@ -205,6 +206,8 @@ private fun SearchResults(
         uiState.errorMessage != null &&
             uiState.books.isEmpty() &&
             uiState.freeBooks.isEmpty() &&
+            uiState.alternativeEditionBooks.isEmpty() &&
+            uiState.otherLanguageBooks.isEmpty() &&
             uiState.otherFreeBooks.isEmpty() -> {
             EmptyMessage(
                 title = stringResource(R.string.catalog_unavailable),
@@ -216,6 +219,8 @@ private fun SearchResults(
         uiState.isLoading &&
             uiState.books.isEmpty() &&
             uiState.freeBooks.isEmpty() &&
+            uiState.alternativeEditionBooks.isEmpty() &&
+            uiState.otherLanguageBooks.isEmpty() &&
             uiState.otherFreeBooks.isEmpty() -> {
             CatalogLoadingPlaceholder(modifier = modifier)
         }
@@ -240,7 +245,10 @@ private fun SearchResults(
             )
         }
 
-        uiState.freeBooks.isNotEmpty() || uiState.otherFreeBooks.isNotEmpty() -> {
+        uiState.freeBooks.isNotEmpty() ||
+            uiState.alternativeEditionBooks.isNotEmpty() ||
+            uiState.otherLanguageBooks.isNotEmpty() ||
+            uiState.otherFreeBooks.isNotEmpty() -> {
             val listState = rememberLazyListState()
             LoadNextPageEffect(
                 listState = listState,
@@ -274,6 +282,54 @@ private fun SearchResults(
                             onRead = { onReadNow(book) },
                             onDownload = { onDownloadBook(book) },
                         )
+                    }
+                    if (uiState.alternativeEditionBooks.isNotEmpty()) {
+                        item(key = "alternative-editions-heading") {
+                            EditionSectionHeading(
+                                title = stringResource(R.string.alternative_editions),
+                                body = stringResource(R.string.alternative_editions_body),
+                            )
+                        }
+                        items(
+                            items = uiState.alternativeEditionBooks,
+                            key = { "alternative-${it.editionId}" },
+                        ) { book ->
+                            FreeBookResultCard(
+                                book = book,
+                                canDownload = true,
+                                isDownloading = uiState.downloadingBookId == book.editionId,
+                                isPreparingToRead = uiState.readingBookId == book.editionId,
+                                actionsEnabled = uiState.downloadingBookId == null &&
+                                    uiState.readingBookId == null,
+                                onOpen = { onFreeBookClick(book.editionId) },
+                                onRead = { onReadNow(book) },
+                                onDownload = { onDownloadBook(book) },
+                            )
+                        }
+                    }
+                    if (uiState.otherLanguageBooks.isNotEmpty()) {
+                        item(key = "other-languages-heading") {
+                            EditionSectionHeading(
+                                title = stringResource(R.string.other_language_editions),
+                                body = stringResource(R.string.other_language_editions_body),
+                            )
+                        }
+                        items(
+                            items = uiState.otherLanguageBooks,
+                            key = { "language-${it.editionId}" },
+                        ) { book ->
+                            FreeBookResultCard(
+                                book = book,
+                                canDownload = true,
+                                isDownloading = uiState.downloadingBookId == book.editionId,
+                                isPreparingToRead = uiState.readingBookId == book.editionId,
+                                actionsEnabled = uiState.downloadingBookId == null &&
+                                    uiState.readingBookId == null,
+                                onOpen = { onFreeBookClick(book.editionId) },
+                                onRead = { onReadNow(book) },
+                                onDownload = { onDownloadBook(book) },
+                            )
+                        }
                     }
                     if (uiState.otherFreeBooks.isNotEmpty()) {
                         item(key = "other-open-editions-heading") {
@@ -390,6 +446,21 @@ private fun SearchResults(
 }
 
 @Composable
+private fun EditionSectionHeading(title: String, body: String) {
+    Column(
+        modifier = Modifier.padding(top = 10.dp, bottom = 2.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        Text(text = title, style = MaterialTheme.typography.titleMedium)
+        Text(
+            text = body,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+@Composable
 private fun LoadNextPageEffect(
     listState: LazyListState,
     enabled: Boolean,
@@ -502,6 +573,26 @@ private fun FreeBookResultCard(
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.primary,
                 )
+                if (book.textEditionType == TextEditionType.HISTORICAL_ORTHOGRAPHY) {
+                    Text(
+                        text = stringResource(R.string.historical_orthography_warning),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                } else if (book.textEditionType == TextEditionType.MODERN_ORTHOGRAPHY) {
+                    Text(
+                        text = stringResource(R.string.modern_orthography),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                }
+                book.editionLabel?.let { label ->
+                    Text(
+                        text = label,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
                 Text(
                     text = if (canDownload) {
                         book.sourceName

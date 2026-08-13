@@ -20,6 +20,9 @@ data class FreeBook(
     val sourcePageTitle: String? = null,
     val sourcePageUrl: String? = null,
     val epubDownloadUrl: String? = null,
+    val rights: FreeBookRights = FreeBookRights(FreeAccessBasis.SOURCE_REPORTED_PUBLIC),
+    val textEditionType: TextEditionType = TextEditionType.UNSPECIFIED,
+    val editionLabel: String? = null,
 ) {
     val sourceName: String
         get() = when (source) {
@@ -59,11 +62,30 @@ data class FreeBook(
         }
 }
 
+enum class TextEditionType {
+    MODERN_ORTHOGRAPHY,
+    HISTORICAL_ORTHOGRAPHY,
+    UNSPECIFIED,
+}
+
 enum class FreeBookSource {
     OPEN_LIBRARY,
     WIKISOURCE,
     STANDARD_EBOOKS,
     AUTHORIZED_PUBLISHER,
+}
+
+data class FreeBookRights(
+    val basis: FreeAccessBasis,
+    val licenseUrl: String? = null,
+    val territoryCodes: List<String> = emptyList(),
+)
+
+enum class FreeAccessBasis {
+    OPEN_LICENSE,
+    RIGHTS_HOLDER_PERMISSION,
+    PUBLIC_DOMAIN_US,
+    SOURCE_REPORTED_PUBLIC,
 }
 
 private val NON_TITLE_CHARACTER_PATTERN = Regex("[^\\p{L}\\p{N}]+")

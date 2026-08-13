@@ -267,6 +267,8 @@ private class FakeOpenLibraryApi : OpenLibraryApi {
         limit: Int,
         page: Int,
         language: String,
+        ebookAccess: String,
+        responseLanguage: String,
     ): OpenLibrarySearchResponseDto {
         searchCallCount += 1
         searchError?.let { throw it }

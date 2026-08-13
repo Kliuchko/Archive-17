@@ -4,6 +4,7 @@ import com.kliuchko.archive17.data.networking.dto.WikisourceQueryDto
 import com.kliuchko.archive17.data.networking.dto.WikisourceSearchResponseDto
 import com.kliuchko.archive17.data.networking.dto.WikisourceSearchResultDto
 import com.kliuchko.archive17.domain.model.FreeBookSource
+import com.kliuchko.archive17.domain.model.TextEditionType
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -39,7 +40,7 @@ class WikisourceMapperTest {
     }
 
     @Test
-    fun `filters chapters and pages without book author metadata`() {
+    fun `keeps uncertain pages but does not mark chapters as downloadable books`() {
         val response = WikisourceSearchResponseDto(
             query = WikisourceQueryDto(
                 search = listOf(
@@ -59,7 +60,37 @@ class WikisourceMapperTest {
             ),
         )
 
-        assertTrue(response.toFreeBooks("rus").isEmpty())
+        val books = response.toFreeBooks("rus")
+
+        assertEquals(2, books.size)
+        assertTrue(books.none { it.isDownloadable })
+        assertTrue(books.any { it.authors.isEmpty() })
+    }
+
+    @Test
+    fun `maps a full edition subpage with old spelling author metadata`() {
+        val response = WikisourceSearchResponseDto(
+            query = WikisourceQueryDto(
+                search = listOf(
+                    WikisourceSearchResultDto(
+                        pageid = 1013142,
+                        ns = 0,
+                        title = "Оливер Твист (Диккенс; Волошинова, Ясинский)/ПСС 1909 (ДО)",
+                        snippet = "Оливер Твист авторъ Чарльз Диккенс, пер. М. П. Волошинова",
+                    ),
+                ),
+            ),
+        )
+
+        val book = response.toFreeBooks("rus").single()
+
+        assertEquals("Оливер Твист", book.title)
+        assertEquals(listOf("Чарльз Диккенс"), book.authors)
+        assertEquals(1909, book.firstPublishYear)
+        assertEquals(TextEditionType.HISTORICAL_ORTHOGRAPHY, book.textEditionType)
+        assertEquals("ПСС 1909", book.editionLabel)
+        assertTrue(book.isDownloadable)
+        assertTrue(book.epubDownloadUrl.orEmpty().contains("%2F"))
     }
 
     @Test

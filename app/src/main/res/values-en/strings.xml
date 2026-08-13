@@ -183,6 +183,19 @@
     <string name="other_open_editions_body">The source marks these editions as open. A suitable EPUB for the Shelf has not been confirmed yet, but the book can be checked at the source.</string>
     <string name="epub_not_confirmed_short">Shelf-ready EPUB not confirmed yet</string>
     <string name="epub_not_confirmed_details">The source marks this edition as open, but Archive 17 has not yet confirmed an EPUB with a suitable language and size. You can open the book at the source.</string>
+    <string name="alternative_editions">Other versions</string>
+    <string name="alternative_editions_body">Other translations and editions of this work are kept here so you can choose the right version.</string>
+    <string name="other_language_editions">Editions in other languages</string>
+    <string name="other_language_editions_body">When a suitable translation is unavailable, you can read an open original or another edition.</string>
+    <string name="historical_orthography_warning">Pre-reform orthography</string>
+    <string name="modern_orthography">Modern orthography</string>
+    <string name="edition_type_label">Text version</string>
+    <string name="edition_details_label">Edition</string>
     <string name="access_label">Access</string>
+    <string name="rights_basis_label">Access basis</string>
+    <string name="rights_open_license">Open source license</string>
+    <string name="rights_holder_permission">Authorized by the rights holder</string>
+    <string name="rights_public_domain_us">Public domain in the US; check the rules in your country</string>
+    <string name="rights_source_reported_public">The source reports public access</string>
     <string name="book_language_label">Book language</string>
 </resources>

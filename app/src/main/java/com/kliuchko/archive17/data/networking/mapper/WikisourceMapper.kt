@@ -3,6 +3,9 @@ package com.kliuchko.archive17.data.networking.mapper
 import com.kliuchko.archive17.data.networking.dto.WikisourceSearchResponseDto
 import com.kliuchko.archive17.domain.model.FreeBook
 import com.kliuchko.archive17.domain.model.FreeBookSource
+import com.kliuchko.archive17.domain.model.FreeBookRights
+import com.kliuchko.archive17.domain.model.FreeAccessBasis
+import com.kliuchko.archive17.domain.model.TextEditionType
 import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
 
@@ -10,27 +13,35 @@ fun WikisourceSearchResponseDto.toFreeBooks(languageCode: String): List<FreeBook
     query?.search.orEmpty()
         .asSequence()
         .filter { it.ns == MAIN_NAMESPACE }
-        .filter { result -> result.title?.contains('/') == false }
         .mapNotNull { result ->
             val pageId = result.pageid ?: return@mapNotNull null
             val pageTitle = result.title?.trim()?.takeIf(String::isNotEmpty)
                 ?: return@mapNotNull null
             val snippet = result.snippet.toPlainText()
-            val author = snippet.extractAuthor() ?: return@mapNotNull null
+            val author = snippet.extractAuthor()
+            val isLikelyChapter = pageTitle.isLikelyChapter()
+            val editionType = pageTitle.toTextEditionType()
             FreeBook(
                 workId = "wikisource-ru-$pageId",
                 editionId = "wikisource-ru-$pageId",
-                title = pageTitle.withoutAuthorSuffix(),
-                authors = listOf(author),
+                title = pageTitle.toCatalogTitle(),
+                authors = listOfNotNull(author),
                 coverId = null,
-                firstPublishYear = snippet.extractYear(),
+                firstPublishYear = snippet.extractYear() ?: pageTitle.extractYear(),
                 languageCode = languageCode,
                 source = FreeBookSource.WIKISOURCE,
                 sourcePageTitle = pageTitle,
-                epubDownloadUrl = buildWikisourceEpubUrl(pageTitle),
+                epubDownloadUrl = if (author != null && !isLikelyChapter) {
+                    buildWikisourceEpubUrl(pageTitle)
+                } else {
+                    null
+                },
+                rights = WIKISOURCE_RIGHTS,
+                textEditionType = editionType,
+                editionLabel = pageTitle.toEditionLabel(),
             )
         }
-        .distinctBy { it.title.lowercase() to it.authors.first().lowercase() }
+        .distinctBy { it.title.lowercase() to it.authors.firstOrNull().orEmpty().lowercase() }
         .toList()
 
 fun curatedRussianWikisourceBooks(page: Int, pageSize: Int = 4): List<FreeBook> =
@@ -50,6 +61,7 @@ fun curatedRussianWikisourceBooks(page: Int, pageSize: Int = 4): List<FreeBook> 
                 source = FreeBookSource.WIKISOURCE,
                 sourcePageTitle = book.pageTitle,
                 epubDownloadUrl = buildWikisourceEpubUrl(book.pageTitle),
+                rights = WIKISOURCE_RIGHTS,
             )
         }
 
@@ -80,7 +92,29 @@ private fun String.extractYear(): Int? = YEAR_PATTERN
     ?.value
     ?.toIntOrNull()
 
-private fun String.withoutAuthorSuffix(): String = replace(AUTHOR_SUFFIX_PATTERN, "").trim()
+private fun String.toCatalogTitle(): String = substringBefore('/')
+    .replace(AUTHOR_SUFFIX_PATTERN, "")
+    .trim()
+
+private fun String.isLikelyChapter(): Boolean {
+    val childPage = substringAfterLast('/', missingDelimiterValue = "")
+    return childPage.isNotBlank() && (
+        CHAPTER_MARKER_PATTERN.containsMatchIn(childPage) ||
+            CHAPTER_NUMBER_PATTERN.matches(childPage.trim())
+        )
+}
+
+private fun String.toTextEditionType(): TextEditionType = when {
+    MODERN_ORTHOGRAPHY_PATTERN.containsMatchIn(this) -> TextEditionType.MODERN_ORTHOGRAPHY
+    HISTORICAL_ORTHOGRAPHY_PATTERN.containsMatchIn(this) ->
+        TextEditionType.HISTORICAL_ORTHOGRAPHY
+    else -> TextEditionType.UNSPECIFIED
+}
+
+private fun String.toEditionLabel(): String? = substringAfter('/', missingDelimiterValue = "")
+    .replace(ORTHOGRAPHY_MARKER_PATTERN, "")
+    .trim(' ', '-', '—')
+    .takeIf(String::isNotBlank)
 
 private data class StarterBook(
     val title: String,
@@ -92,14 +126,26 @@ private data class StarterBook(
 private const val MAIN_NAMESPACE = 0
 private const val RUSSIAN_LANGUAGE = "rus"
 private const val WS_EXPORT_BASE_URL = "https://ws-export.wmcloud.org/"
+private val WIKISOURCE_RIGHTS = FreeBookRights(
+    basis = FreeAccessBasis.OPEN_LICENSE,
+    licenseUrl = "https://creativecommons.org/licenses/by-sa/3.0/",
+)
 private val HTML_TAG_PATTERN = Regex("<[^>]+>")
 private val WHITESPACE_PATTERN = Regex("\\s+")
 private val AUTHOR_PATTERN = Regex(
-    "(?:^|\\s)автор\\s+(.+?)(?=\\s(?:[12][0-9]{3}|←|→)|$)",
+    "(?:^|\\s)автор(?:ъ|ом)?\\s+(.+?)(?=\\s*,?\\s*(?:пер\\.|перевод|[12][0-9]{3}|←|→)|$)",
     RegexOption.IGNORE_CASE,
 )
 private val YEAR_PATTERN = Regex("\\b(?:1[0-9]{3}|20[0-2][0-9])\\b")
 private val AUTHOR_SUFFIX_PATTERN = Regex("\\s+\\([^()]+\\)$")
+private val CHAPTER_MARKER_PATTERN = Regex(
+    "(?:^|\\s)(?:глава|chapter|сцена|scene|песнь|song)\\b",
+    RegexOption.IGNORE_CASE,
+)
+private val CHAPTER_NUMBER_PATTERN = Regex("(?:[IVXLCDM]+|[0-9]+)[.]?", RegexOption.IGNORE_CASE)
+private val MODERN_ORTHOGRAPHY_PATTERN = Regex("\\(СО\\)", RegexOption.IGNORE_CASE)
+private val HISTORICAL_ORTHOGRAPHY_PATTERN = Regex("\\(ДО\\)", RegexOption.IGNORE_CASE)
+private val ORTHOGRAPHY_MARKER_PATTERN = Regex("\\s*\\((?:СО|ДО)\\)\\s*", RegexOption.IGNORE_CASE)
 
 private val RUSSIAN_STARTER_BOOKS = listOf(
     StarterBook(
