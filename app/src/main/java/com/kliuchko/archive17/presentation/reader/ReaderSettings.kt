@@ -1,12 +1,15 @@
-@file:OptIn(org.readium.r2.shared.ExperimentalReadiumApi::class)
+@file:OptIn(
+    org.readium.r2.shared.ExperimentalReadiumApi::class,
+    androidx.compose.foundation.layout.ExperimentalLayoutApi::class,
+)
 
 package com.kliuchko.archive17.presentation.reader
 
 import androidx.annotation.StringRes
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.FlowRowScope
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
@@ -86,7 +89,7 @@ internal fun ReaderSettingsPanel(
 @Composable
 private fun ReaderSettingRow(
     label: String,
-    content: @Composable RowScope.() -> Unit,
+    content: @Composable FlowRowScope.() -> Unit,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
         Text(
@@ -94,9 +97,10 @@ private fun ReaderSettingRow(
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        Row(
+        FlowRow(
             horizontalArrangement = Arrangement.spacedBy(6.dp),
-            verticalAlignment = Alignment.CenterVertically,
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+            itemVerticalAlignment = Alignment.CenterVertically,
             content = content,
         )
     }

@@ -27,9 +27,13 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.res.stringResource
@@ -38,6 +42,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.kliuchko.archive17.domain.model.LibraryBook
 import com.kliuchko.archive17.domain.model.LocalBook
 import com.kliuchko.archive17.presentation.components.ArchiveBrand
+import com.kliuchko.archive17.presentation.components.ArchiveFloatingHeader
 import com.kliuchko.archive17.presentation.components.BookCover
 import com.kliuchko.archive17.presentation.components.LocalBookCover
 import com.kliuchko.archive17.presentation.components.localizedDisplayName
@@ -68,53 +73,22 @@ fun LibraryScreen(
         }
     }
 
+    var headerHeightPx by remember { mutableIntStateOf(0) }
+    val headerPadding = with(LocalDensity.current) { headerHeightPx.toDp() } + 12.dp
+
     Box(modifier = modifier.fillMaxSize()) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = 20.dp, vertical = 18.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp),
-        ) {
-        ArchiveBrand()
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                Text(text = stringResource(R.string.shelf_title), style = MaterialTheme.typography.headlineMedium)
-                Text(
-                    text = shelfSubtitle(uiState.bookCount),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            TextButton(onClick = openFilePicker, enabled = !uiState.isImporting) {
-                Text(stringResource(if (uiState.isImporting) R.string.adding else R.string.add_epub))
-            }
-        }
-
-        androidx.compose.foundation.lazy.LazyRow(
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            items(LibraryFilter.entries.size) { index ->
-                val filter = LibraryFilter.entries[index]
-                FilterChip(
-                    selected = uiState.selectedFilter == filter,
-                    onClick = { viewModel.onFilterSelected(filter) },
-                    label = { Text(text = filter.localizedDisplayName()) },
-                )
-            }
-        }
-
         Box(
             modifier = Modifier
-                .fillMaxWidth()
-                .weight(1f),
+                .fillMaxSize()
+                .padding(horizontal = 20.dp),
         ) {
             when {
                 uiState.isLoading -> {
-                    CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
+                    CircularProgressIndicator(
+                        modifier = Modifier
+                            .align(Alignment.Center)
+                            .padding(top = headerPadding),
+                    )
                 }
 
                 uiState.isEmpty -> {
@@ -123,7 +97,9 @@ fun LibraryScreen(
                         onCatalogClick = onCatalogClick,
                         onImportClick = openFilePicker,
                         isImporting = uiState.isImporting,
-                        modifier = Modifier.fillMaxSize(),
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(top = headerPadding),
                     )
                 }
 
@@ -131,7 +107,10 @@ fun LibraryScreen(
                     LazyVerticalGrid(
                         columns = GridCells.Adaptive(104.dp),
                         modifier = Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(bottom = 24.dp),
+                        contentPadding = PaddingValues(
+                            top = headerPadding,
+                            bottom = 24.dp,
+                        ),
                         horizontalArrangement = Arrangement.spacedBy(12.dp),
                         verticalArrangement = Arrangement.spacedBy(18.dp),
                     ) {
@@ -158,6 +137,50 @@ fun LibraryScreen(
                 }
             }
         }
+        ArchiveFloatingHeader(
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .onSizeChanged { headerHeightPx = it.height },
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                    Text(
+                        text = stringResource(R.string.shelf_title),
+                        style = MaterialTheme.typography.headlineSmall,
+                    )
+                    Text(
+                        text = shelfSubtitle(uiState.bookCount),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Column(horizontalAlignment = Alignment.End) {
+                    ArchiveBrand()
+                    TextButton(onClick = openFilePicker, enabled = !uiState.isImporting) {
+                        Text(
+                            stringResource(
+                                if (uiState.isImporting) R.string.adding else R.string.add_epub,
+                            ),
+                        )
+                    }
+                }
+            }
+            androidx.compose.foundation.lazy.LazyRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                items(LibraryFilter.entries.size) { index ->
+                    val filter = LibraryFilter.entries[index]
+                    FilterChip(
+                        selected = uiState.selectedFilter == filter,
+                        onClick = { viewModel.onFilterSelected(filter) },
+                        label = { Text(text = filter.localizedDisplayName()) },
+                    )
+                }
+            }
         }
         SnackbarHost(
             hostState = snackbarHostState,

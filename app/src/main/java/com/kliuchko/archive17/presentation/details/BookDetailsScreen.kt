@@ -6,11 +6,13 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
@@ -25,8 +27,13 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -39,6 +46,7 @@ import com.kliuchko.archive17.domain.model.EditionAvailability
 import com.kliuchko.archive17.domain.model.PublicationEdition
 import com.kliuchko.archive17.domain.model.TemporaryBook
 import com.kliuchko.archive17.presentation.components.BookCover
+import com.kliuchko.archive17.presentation.components.ArchiveFloatingHeader
 import com.kliuchko.archive17.presentation.components.bookLanguageName
 import com.kliuchko.archive17.presentation.components.localizedDisplayName
 import org.koin.androidx.compose.koinViewModel
@@ -70,31 +78,18 @@ fun BookDetailsScreen(
         }
     }
 
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = 20.dp, vertical = 18.dp),
-        verticalArrangement = Arrangement.spacedBy(18.dp),
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            OutlinedButton(onClick = onBackClick) {
-                Text(text = stringResource(R.string.back))
-            }
-            Text(
-                text = stringResource(
-                    if (uiState.selectedStatus == null) R.string.catalog_uppercase else R.string.in_archive_uppercase,
-                ),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.primary,
-            )
-        }
+    var headerHeightPx by remember { mutableIntStateOf(0) }
+    val headerPadding = with(LocalDensity.current) { headerHeightPx.toDp() } + 18.dp
 
-        when {
+    Box(modifier = modifier.fillMaxSize()) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(start = 20.dp, top = headerPadding, end = 20.dp, bottom = 24.dp),
+            verticalArrangement = Arrangement.spacedBy(18.dp),
+        ) {
+            when {
             uiState.isLoading -> {
                 Box(
                     modifier = Modifier
@@ -329,6 +324,33 @@ fun BookDetailsScreen(
                     )
                 }
             }
+            }
+        }
+        ArchiveFloatingHeader(
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .onSizeChanged { headerHeightPx = it.height },
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                OutlinedButton(onClick = onBackClick) {
+                    Text(text = stringResource(R.string.back))
+                }
+                Text(
+                    text = stringResource(
+                        if (uiState.selectedStatus == null) {
+                            R.string.catalog_uppercase
+                        } else {
+                            R.string.in_archive_uppercase
+                        },
+                    ),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            }
         }
     }
 }
@@ -349,7 +371,14 @@ private fun WorkEditionCard(
     val access = edition.accessOptions.firstOrNull()
     Card(
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = if (isSelected) {
+                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.58f)
+            } else {
+                MaterialTheme.colorScheme.surface
+            },
+        ),
     ) {
         Column(
             modifier = Modifier.padding(14.dp),
@@ -411,15 +440,25 @@ private fun WorkEditionCard(
                         onClick = onRead,
                         enabled = !isBusy,
                         modifier = Modifier.weight(1f),
+                        contentPadding = PaddingValues(horizontal = 8.dp),
                     ) {
-                        Text(stringResource(R.string.read_now))
+                        Text(
+                            text = stringResource(R.string.read_now),
+                            style = MaterialTheme.typography.labelMedium,
+                            maxLines = 1,
+                        )
                     }
                     Button(
                         onClick = onAddToShelf,
                         enabled = !isBusy,
                         modifier = Modifier.weight(1f),
+                        contentPadding = PaddingValues(horizontal = 8.dp),
                     ) {
-                        Text(stringResource(R.string.download_to_shelf))
+                        Text(
+                            text = stringResource(R.string.download_to_shelf),
+                            style = MaterialTheme.typography.labelMedium,
+                            maxLines = 1,
+                        )
                     }
                 }
             } else if (!access?.actionUrl.isNullOrBlank()) {

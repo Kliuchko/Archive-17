@@ -126,6 +126,7 @@
     <string name="reader_page">Страница %1$d</string>
     <string name="reader_progress">%1$d%%</string>
     <string name="reader_settings">Настройки чтения</string>
+    <string name="reader_close_panel">Закрыть панель</string>
     <string name="reader_navigation">Навигация по книге</string>
     <string name="reader_contents">Оглавление</string>
     <string name="reader_contents_empty">В этой книге нет оглавления.</string>

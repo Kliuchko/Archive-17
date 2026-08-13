@@ -126,6 +126,7 @@
     <string name="reader_page">Page %1$d</string>
     <string name="reader_progress">%1$d%%</string>
     <string name="reader_settings">Reading settings</string>
+    <string name="reader_close_panel">Close panel</string>
     <string name="reader_navigation">Book navigation</string>
     <string name="reader_contents">Contents</string>
     <string name="reader_contents_empty">This book has no table of contents.</string>

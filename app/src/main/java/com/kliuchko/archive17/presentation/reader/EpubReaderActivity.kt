@@ -7,18 +7,20 @@ import android.os.Bundle
 import android.view.Gravity
 import android.view.View
 import android.widget.FrameLayout
-import android.widget.LinearLayout
 import android.widget.ProgressBar
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -30,6 +32,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.platform.ComposeView
+import androidx.compose.ui.res.stringResource
 import androidx.appcompat.app.AppCompatActivity
 import androidx.fragment.app.commitNow
 import androidx.lifecycle.Lifecycle
@@ -221,18 +224,9 @@ class EpubReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener {
     )
 
     private fun createContent() {
-        val root = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
+        val root = FrameLayout(this).apply {
             setBackgroundColor(android.graphics.Color.rgb(247, 243, 235))
         }
-        titleView = ComposeView(this)
-        root.addView(
-            titleView,
-            LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT,
-            ),
-        )
         readerContainer = FrameLayout(this).apply {
             id = View.generateViewId()
             addView(
@@ -246,17 +240,30 @@ class EpubReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener {
         }
         root.addView(
             readerContainer,
-            LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                0,
-                1f,
+            FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT,
+            ).apply {
+                topMargin = (READER_TOOLBAR_HEIGHT_DP * resources.displayMetrics.density).toInt()
+            },
+        )
+        titleView = ComposeView(this)
+        root.addView(
+            titleView,
+            FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.WRAP_CONTENT,
+                Gravity.TOP,
             ),
         )
         setContentView(root)
         titleView.setContent {
             Archive17Theme(darkTheme = readerPreferences.theme == ReaderTheme.DARK) {
-                Surface(color = readerPreferences.toolbarColor()) {
-                    Column {
+                Column {
+                    Surface(
+                        color = readerPreferences.toolbarColor().copy(alpha = 0.94f),
+                        shadowElevation = 5.dp,
+                    ) {
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -321,13 +328,17 @@ class EpubReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener {
                                 Text(text = "›", fontSize = 28.sp)
                             }
                         }
-                        if (settingsVisible) {
+                    }
+                    if (settingsVisible) {
+                        ReaderFloatingPanel(onClose = { settingsVisible = false }) {
                             ReaderSettingsPanel(
                                 preferences = readerPreferences,
                                 onChange = ::applyReaderPreferences,
                             )
                         }
-                        if (navigationVisible) {
+                    }
+                    if (navigationVisible) {
+                        ReaderFloatingPanel(onClose = { navigationVisible = false }) {
                             ReaderNavigationPanel(
                                 section = navigationSection,
                                 tocEntries = tocEntries,
@@ -541,6 +552,7 @@ class EpubReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener {
     }
 
     companion object {
+        private const val READER_TOOLBAR_HEIGHT_DP = 56
         private const val EXTRA_BOOK_ID = "book_id"
         private const val EXTRA_TEMPORARY_EDITION_ID = "temporary_edition_id"
         private const val EXTRA_TEMPORARY_TITLE = "temporary_title"
@@ -577,4 +589,37 @@ class EpubReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener {
         val storageKey: String,
         val legacyStorageKeys: List<String> = emptyList(),
     )
+}
+
+@Composable
+private fun ReaderFloatingPanel(
+    onClose: () -> Unit,
+    content: @Composable () -> Unit,
+) {
+    val closeDescription = stringResource(R.string.reader_close_panel)
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 8.dp, vertical = 6.dp),
+        shape = RoundedCornerShape(18.dp),
+        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f),
+        tonalElevation = 4.dp,
+        shadowElevation = 8.dp,
+    ) {
+        Box {
+            Box(modifier = Modifier.padding(top = 34.dp)) {
+                content()
+            }
+            IconButton(
+                onClick = onClose,
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .semantics {
+                        contentDescription = closeDescription
+                    },
+            ) {
+                Text(text = "×", style = MaterialTheme.typography.titleLarge)
+            }
+        }
+    }
 }
