@@ -122,6 +122,17 @@
     <string name="reader_page">Страница %1$d</string>
     <string name="reader_progress">%1$d%%</string>
     <string name="reader_settings">Настройки чтения</string>
+    <string name="reader_navigation">Навигация по книге</string>
+    <string name="reader_contents">Оглавление</string>
+    <string name="reader_contents_empty">В этой книге нет оглавления.</string>
+    <string name="reader_search">Поиск</string>
+    <string name="reader_search_hint">Слово или фраза</string>
+    <string name="reader_find">Найти</string>
+    <string name="reader_search_empty">В тексте книги ничего не найдено.</string>
+    <string name="reader_search_unavailable">Поиск недоступен для этого файла.</string>
+    <string name="reader_bookmarks">Закладки</string>
+    <string name="reader_add_bookmark">Сохранить текущую страницу</string>
+    <string name="reader_bookmarks_empty">Здесь будут сохранённые места этой книги.</string>
     <string name="reader_text_size">Размер текста</string>
     <string name="reader_font">Шрифт</string>
     <string name="reader_font_publisher">Издательский</string>

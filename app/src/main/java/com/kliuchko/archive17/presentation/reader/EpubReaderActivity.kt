@@ -41,16 +41,21 @@ import com.kliuchko.archive17.domain.model.TemporaryBook
 import com.kliuchko.archive17.domain.repository.LocalBookRepository
 import com.kliuchko.archive17.presentation.theme.Archive17Theme
 import java.io.File
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
+import org.json.JSONArray
 import org.json.JSONObject
 import org.koin.android.ext.android.inject
 import org.readium.r2.navigator.epub.EpubNavigatorFactory
 import org.readium.r2.navigator.epub.EpubNavigatorFragment
 import org.readium.r2.shared.ExperimentalReadiumApi
 import org.readium.r2.shared.publication.Locator
+import org.readium.r2.shared.publication.Link
 import org.readium.r2.shared.publication.services.positions
+import org.readium.r2.shared.publication.services.search.isSearchable
+import org.readium.r2.shared.publication.services.search.search
 import org.readium.r2.shared.util.AbsoluteUrl
 
 @OptIn(ExperimentalReadiumApi::class, kotlinx.coroutines.FlowPreview::class)
@@ -65,7 +70,18 @@ class EpubReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener {
     private var readerTitle by mutableStateOf("")
     private var pageLabel by mutableStateOf("")
     private var settingsVisible by mutableStateOf(false)
+    private var navigationVisible by mutableStateOf(false)
+    private var navigationSection by mutableStateOf(ReaderNavigationSection.CONTENTS)
     private var readerPreferences by mutableStateOf(ReaderPreferences.defaults())
+    private var tocEntries by mutableStateOf(emptyList<ReaderTocEntry>())
+    private var bookmarks by mutableStateOf(emptyList<Locator>())
+    private var searchQuery by mutableStateOf("")
+    private var searchResults by mutableStateOf(emptyList<ReaderSearchResult>())
+    private var searchInProgress by mutableStateOf(false)
+    private var searchSubmitted by mutableStateOf(false)
+    private var searchUnavailable by mutableStateOf(false)
+    private var readerStorageKey: String? = null
+    private var searchJob: Job? = null
     private var totalPositions = 0
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -80,6 +96,9 @@ class EpubReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener {
             finish()
             return
         }
+        readerStorageKey = bookId?.let { "local:$it" }
+            ?: temporaryEditionId?.let { "temporary:$it" }
+        bookmarks = loadBookmarks()
 
         lifecycleScope.launch {
             val readerBook = if (bookId != null) {
@@ -102,6 +121,8 @@ class EpubReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener {
                 showTitle(readerBook.title)
                 val publication = readiumService.open(readerBook.file)
                 openedPublication = publication
+                tocEntries = flattenTableOfContents(publication.tableOfContents, publication)
+                searchUnavailable = !publication.isSearchable
                 totalPositions = runCatching { publication.positions().size }.getOrDefault(0)
                 val initialLocator = readerBook.progressionJson?.let {
                     runCatching { Locator.fromJSON(JSONObject(it)) }.getOrNull()
@@ -139,6 +160,7 @@ class EpubReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener {
     }
 
     override fun onDestroy() {
+        searchJob?.cancel()
         navigator = null
         super.onDestroy()
         openedPublication?.close()
@@ -249,7 +271,21 @@ class EpubReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener {
                                 )
                             }
                             IconButton(
-                                onClick = { settingsVisible = !settingsVisible },
+                                onClick = {
+                                    navigationVisible = !navigationVisible
+                                    settingsVisible = false
+                                },
+                                modifier = Modifier.semantics {
+                                    contentDescription = getString(R.string.reader_navigation)
+                                },
+                            ) {
+                                Text(text = "☰", style = MaterialTheme.typography.titleMedium)
+                            }
+                            IconButton(
+                                onClick = {
+                                    settingsVisible = !settingsVisible
+                                    navigationVisible = false
+                                },
                                 modifier = Modifier.semantics {
                                     contentDescription = getString(R.string.reader_settings)
                                 },
@@ -279,6 +315,27 @@ class EpubReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener {
                                 onChange = ::applyReaderPreferences,
                             )
                         }
+                        if (navigationVisible) {
+                            ReaderNavigationPanel(
+                                section = navigationSection,
+                                tocEntries = tocEntries,
+                                bookmarks = bookmarks,
+                                searchQuery = searchQuery,
+                                searchResults = searchResults,
+                                searchInProgress = searchInProgress,
+                                searchSubmitted = searchSubmitted,
+                                searchUnavailable = searchUnavailable,
+                                onSectionChange = { navigationSection = it },
+                                onSearchQueryChange = {
+                                    searchQuery = it
+                                    searchSubmitted = false
+                                },
+                                onSearch = ::searchPublication,
+                                onAddBookmark = ::addCurrentBookmark,
+                                onRemoveBookmark = ::removeBookmark,
+                                onGo = ::goToLocator,
+                            )
+                        }
                     }
                 }
             }
@@ -294,6 +351,126 @@ class EpubReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener {
         readerPreferences = preferences
         saveReaderPreferences(preferences)
         navigator?.submitPreferences(preferences.toEpubPreferences())
+    }
+
+    private fun flattenTableOfContents(
+        links: List<Link>,
+        publication: org.readium.r2.shared.publication.Publication,
+        depth: Int = 0,
+    ): List<ReaderTocEntry> = links.flatMap { link ->
+        val current = link.title?.takeIf(String::isNotBlank)?.let { title ->
+            publication.locatorFromLink(link)?.let { locator ->
+                listOf(ReaderTocEntry(title = title, locator = locator, depth = depth))
+            }
+        }.orEmpty()
+        current + flattenTableOfContents(link.children, publication, depth + 1)
+    }
+
+    private fun searchPublication() {
+        val query = searchQuery.trim()
+        val publication = openedPublication ?: return
+        if (query.length < 2 || searchInProgress || searchUnavailable) return
+        searchJob?.cancel()
+        searchJob = lifecycleScope.launch {
+            searchInProgress = true
+            searchSubmitted = true
+            searchResults = emptyList()
+            try {
+                val iterator = publication.search(query)
+                if (iterator == null) {
+                    searchUnavailable = true
+                    return@launch
+                }
+                try {
+                    val found = mutableListOf<ReaderSearchResult>()
+                    while (found.size < MAX_SEARCH_RESULTS) {
+                        val collection = iterator.next().getOrNull() ?: break
+                        if (collection.locators.isEmpty()) break
+                        found += collection.locators.map { locator ->
+                            ReaderSearchResult(locator, searchExcerpt(locator))
+                        }
+                        searchResults = found.take(MAX_SEARCH_RESULTS)
+                    }
+                } finally {
+                    iterator.close()
+                }
+            } catch (_: Throwable) {
+                searchUnavailable = true
+            } finally {
+                searchInProgress = false
+            }
+        }
+    }
+
+    private fun searchExcerpt(locator: Locator): String {
+        val text = locator.text
+        return buildString {
+            text.before?.takeLast(60)?.takeIf(String::isNotBlank)?.let {
+                append("…")
+                append(it.trim())
+                append(' ')
+            }
+            text.highlight?.takeIf(String::isNotBlank)?.let { append(it.trim()) }
+            text.after?.take(90)?.takeIf(String::isNotBlank)?.let {
+                append(' ')
+                append(it.trim())
+                append("…")
+            }
+        }.ifBlank { locator.title.orEmpty() }
+    }
+
+    private fun goToLocator(locator: Locator) {
+        navigator?.go(locator, animated = true)
+        navigationVisible = false
+    }
+
+    private fun addCurrentBookmark() {
+        val locator = navigator?.currentLocator?.value ?: return
+        if (bookmarks.any { bookmarkIdentity(it) == bookmarkIdentity(locator) }) return
+        bookmarks = (bookmarks + locator).sortedBy {
+            it.locations.totalProgression ?: Double.MAX_VALUE
+        }
+        saveBookmarks()
+    }
+
+    private fun removeBookmark(locator: Locator) {
+        val identity = bookmarkIdentity(locator)
+        bookmarks = bookmarks.filterNot { bookmarkIdentity(it) == identity }
+        saveBookmarks()
+    }
+
+    private fun bookmarkIdentity(locator: Locator): String = buildString {
+        append(locator.href.removeFragment())
+        append(':')
+        append(locator.locations.position ?: "")
+        append(':')
+        append(locator.locations.progression?.let { (it * 10_000).toInt() } ?: "")
+    }
+
+    private fun loadBookmarks(): List<Locator> {
+        val storageKey = readerStorageKey ?: return emptyList()
+        val raw = getSharedPreferences(READER_BOOKMARKS, MODE_PRIVATE)
+            .getString(storageKey, null)
+            ?: return emptyList()
+        return runCatching {
+            val array = JSONArray(raw)
+            buildList {
+                for (index in 0 until array.length()) {
+                    Locator.fromJSON(array.getJSONObject(index))?.let(::add)
+                }
+            }
+        }.getOrDefault(emptyList())
+    }
+
+    private fun saveBookmarks() {
+        val storageKey = readerStorageKey ?: return
+        val array = JSONArray().apply {
+            bookmarks.forEach { put(it.toJSON()) }
+        }
+        getSharedPreferences(READER_BOOKMARKS, MODE_PRIVATE)
+            .edit()
+            .putString(storageKey, array.toString())
+            .apply()
     }
 
     private fun loadReaderPreferences(): ReaderPreferences {
@@ -346,12 +523,14 @@ class EpubReaderActivity : AppCompatActivity(), EpubNavigatorFragment.Listener {
         private const val TEMPORARY_READING_DIRECTORY = "temporary-reading"
         private const val TEMPORARY_PROGRESSION_PREFERENCES = "temporary_reader_progress"
         private const val READER_PREFERENCES = "reader_preferences"
+        private const val READER_BOOKMARKS = "reader_bookmarks"
         private const val KEY_FONT_SIZE = "font_size"
         private const val KEY_LINE_HEIGHT = "line_height"
         private const val KEY_FONT = "font"
         private const val KEY_THEME = "theme"
         private const val DEFAULT_FONT_SIZE = 1.0
         private const val DEFAULT_LINE_HEIGHT = 1.5
+        private const val MAX_SEARCH_RESULTS = 100
 
         fun createIntent(context: android.content.Context, bookId: String): Intent =
             Intent(context, EpubReaderActivity::class.java).putExtra(EXTRA_BOOK_ID, bookId)

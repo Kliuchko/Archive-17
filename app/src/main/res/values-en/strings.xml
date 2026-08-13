@@ -122,6 +122,17 @@
     <string name="reader_page">Page %1$d</string>
     <string name="reader_progress">%1$d%%</string>
     <string name="reader_settings">Reading settings</string>
+    <string name="reader_navigation">Book navigation</string>
+    <string name="reader_contents">Contents</string>
+    <string name="reader_contents_empty">This book has no table of contents.</string>
+    <string name="reader_search">Search</string>
+    <string name="reader_search_hint">Word or phrase</string>
+    <string name="reader_find">Find</string>
+    <string name="reader_search_empty">Nothing was found in the book.</string>
+    <string name="reader_search_unavailable">Search is unavailable for this file.</string>
+    <string name="reader_bookmarks">Bookmarks</string>
+    <string name="reader_add_bookmark">Save current page</string>
+    <string name="reader_bookmarks_empty">Saved places from this book will appear here.</string>
     <string name="reader_text_size">Text size</string>
     <string name="reader_font">Font</string>
     <string name="reader_font_publisher">Publisher</string>
