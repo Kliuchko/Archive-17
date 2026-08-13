@@ -112,7 +112,7 @@
     <string name="edition_language">Edition language</string>
     <string name="subjects">Topics</string>
     <string name="subjects_missing">No topics specified.</string>
-    <string name="saved_locally">Saved locally</string>
+    <string name="saved_locally">Details loaded</string>
     <string name="details_may_be_stale">Details may be outdated</string>
     <string name="updating">Updating</string>
     <string name="opening_book">Opening book…</string>
@@ -207,6 +207,8 @@
     <string name="edition_access_coming_soon">Coming soon</string>
     <string name="edition_access_region_restricted">Availability depends on region</string>
     <string name="edition_access_unavailable">Currently unavailable</string>
+    <string name="purchase_options_soon">Purchase and subscription · soon</string>
+    <string name="catalog_editions_found">Editions in catalog: %1$d</string>
     <plurals name="available_edition_count">
         <item quantity="one">%d available edition</item>
         <item quantity="other">%d available editions</item>

@@ -62,44 +62,44 @@ fun OpenLibrarySearchResponseDto.toFreeBooks(expectedLanguageCode: String? = nul
 
 fun OpenLibrarySearchResponseDto.toPublicationEditions(
     expectedLanguageCode: String,
-): List<PublicationEdition> = docs.mapNotNull { document ->
-    val workId = document.key.toWorkId() ?: return@mapNotNull null
-    val edition = document.editions
+): List<PublicationEdition> = docs.flatMap { document ->
+    val workId = document.key.toWorkId() ?: return@flatMap emptyList()
+    document.editions
         ?.docs
         .orEmpty()
-        .firstOrNull { candidate ->
-            !candidate.key.isNullOrBlank() &&
-                candidate.languages.orEmpty().contains(expectedLanguageCode)
+        .mapNotNull { edition ->
+            if (!edition.languages.orEmpty().contains(expectedLanguageCode)) {
+                return@mapNotNull null
+            }
+            val editionId = edition.key
+                ?.removePrefix("/books/")
+                ?.takeIf(String::isNotBlank)
+                ?: return@mapNotNull null
+            val title = localizedTitle(
+                editionTitle = edition.title,
+                workTitle = document.title,
+                languageCode = expectedLanguageCode,
+            ) ?: return@mapNotNull null
+            PublicationEdition(
+                id = editionId,
+                workId = workId,
+                title = title,
+                authors = document.authorNames.normalizeList(),
+                languageCode = expectedLanguageCode,
+                translator = edition.contributors.extractTranslator(),
+                publishedYear = edition.publishDate.toEditionYear(),
+                publisher = edition.publishers.normalizeList().firstOrNull(),
+                coverId = document.preferredCoverId(edition),
+                accessOptions = listOf(
+                    EditionAccessOption(
+                        mode = EditionAccessMode.REFERENCE,
+                        availability = EditionAvailability.UNAVAILABLE,
+                        providerName = OPEN_LIBRARY_NAME,
+                        actionUrl = "$OPEN_LIBRARY_BOOK_URL$editionId",
+                    ),
+                ),
+            )
         }
-        ?: return@mapNotNull null
-    val editionId = edition.key
-        ?.removePrefix("/books/")
-        ?.takeIf(String::isNotBlank)
-        ?: return@mapNotNull null
-    val title = localizedTitle(
-        editionTitle = edition.title,
-        workTitle = document.title,
-        languageCode = expectedLanguageCode,
-    ) ?: return@mapNotNull null
-    PublicationEdition(
-        id = editionId,
-        workId = workId,
-        title = title,
-        authors = document.authorNames.normalizeList(),
-        languageCode = expectedLanguageCode,
-        translator = edition.contributors.extractTranslator(),
-        publishedYear = edition.publishDate.toEditionYear(),
-        publisher = edition.publishers.normalizeList().firstOrNull(),
-        coverId = document.preferredCoverId(edition),
-        accessOptions = listOf(
-            EditionAccessOption(
-                mode = EditionAccessMode.REFERENCE,
-                availability = EditionAvailability.UNAVAILABLE,
-                providerName = OPEN_LIBRARY_NAME,
-                actionUrl = "$OPEN_LIBRARY_BOOK_URL$editionId",
-            ),
-        ),
-    )
 }
 
 fun OpenLibrarySearchDocDto.toDomain(lastUpdatedAt: Long? = null): Work? {

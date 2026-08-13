@@ -112,7 +112,7 @@
     <string name="edition_language">Язык издания</string>
     <string name="subjects">Темы</string>
     <string name="subjects_missing">Темы не указаны.</string>
-    <string name="saved_locally">Сохранено локально</string>
+    <string name="saved_locally">Сведения загружены</string>
     <string name="details_may_be_stale">Сведения могут быть устаревшими</string>
     <string name="updating">Обновление</string>
     <string name="opening_book">Открываем книгу…</string>
@@ -207,6 +207,8 @@
     <string name="edition_access_coming_soon">Скоро</string>
     <string name="edition_access_region_restricted">Доступ зависит от региона</string>
     <string name="edition_access_unavailable">Пока недоступно</string>
+    <string name="purchase_options_soon">Покупка и подписка · скоро</string>
+    <string name="catalog_editions_found">Изданий в каталоге: %1$d</string>
     <plurals name="available_edition_count">
         <item quantity="one">%d доступное издание</item>
         <item quantity="few">%d доступных издания</item>

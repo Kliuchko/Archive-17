@@ -8,9 +8,11 @@ import com.kliuchko.archive17.data.local.mapper.toEntity
 import com.kliuchko.archive17.data.networking.api.OpenLibraryApi
 import com.kliuchko.archive17.data.networking.CoverMatchEnricher
 import com.kliuchko.archive17.data.networking.mapper.toDomain
+import com.kliuchko.archive17.data.networking.mapper.toPublicationEditions
 import com.kliuchko.archive17.domain.model.LibraryBook
 import com.kliuchko.archive17.domain.model.LibraryEntry
 import com.kliuchko.archive17.domain.model.ReadingStatus
+import com.kliuchko.archive17.domain.model.PublicationEdition
 import com.kliuchko.archive17.domain.model.Work
 import com.kliuchko.archive17.domain.model.WorkDetails
 import com.kliuchko.archive17.domain.repository.BookRepository
@@ -77,6 +79,13 @@ class DefaultBookRepository(
         }
     }
 
+    override suspend fun cacheCatalogWorks(works: List<Work>): RepositoryResult<Unit> =
+        runRepositoryCatching(errorMessage = "Не удалось сохранить сведения каталога.") {
+            val now = timeProvider.currentTimeMillis()
+            workDao.upsertWorks(works.map { work -> work.toEntity(now) })
+            RepositoryResult.Success(Unit)
+        }
+
     override fun observeWorkDetails(workId: String): Flow<WorkDetails> {
         val workFlow = workDao.observeWork(workId).map { it?.toDomain() }
         val entryFlow = libraryEntryDao.observeLibraryEntry(workId).map { it?.toDomain() }
@@ -123,6 +132,45 @@ class DefaultBookRepository(
                 )
             } ?: RepositoryResult.Error("Unable to load book details.")
         }
+    }
+
+    override suspend fun getPublicationEditions(
+        work: Work,
+        preferredLanguageCode: String,
+    ): RepositoryResult<List<PublicationEdition>> = runRepositoryCatching(
+        errorMessage = "Не удалось загрузить издания книги.",
+    ) {
+        val fallbackLanguageCode = if (preferredLanguageCode == ENGLISH_EDITION_LANGUAGE) {
+            RUSSIAN_EDITION_LANGUAGE
+        } else {
+            ENGLISH_EDITION_LANGUAGE
+        }
+        val languageCodes = listOf(preferredLanguageCode, fallbackLanguageCode)
+            .filter { it.matches(EDITION_LANGUAGE_PATTERN) }
+            .distinct()
+        val responses = coroutineScope {
+            languageCodes.map { languageCode ->
+                async {
+                    languageCode to api.searchEditionMetadata(
+                        query = work.title,
+                        language = languageCode,
+                        responseLanguage = languageCode.toIso6391(),
+                    )
+                }
+            }.awaitAll()
+        }
+        val editions = responses
+            .flatMap { (languageCode, response) ->
+                response.toPublicationEditions(languageCode)
+            }
+            .filter { edition -> edition.workId == work.id }
+            .distinctBy(PublicationEdition::id)
+            .sortedWith(
+                compareByDescending<PublicationEdition> {
+                    it.languageCode == preferredLanguageCode
+                }.thenByDescending { it.publishedYear ?: Int.MIN_VALUE },
+            )
+        RepositoryResult.Success(editions)
     }
 
     override fun observeLibrary(status: ReadingStatus?): Flow<List<LibraryBook>> =
@@ -184,5 +232,15 @@ class DefaultBookRepository(
         const val MIN_SEARCH_QUERY_LENGTH = 2
         const val MAX_SOURCE_QUERIES = 3
         const val DEFAULT_CACHE_FRESHNESS_MILLIS = 24L * 60L * 60L * 1000L
+        private const val ENGLISH_EDITION_LANGUAGE = "eng"
+        private const val RUSSIAN_EDITION_LANGUAGE = "rus"
+        private val EDITION_LANGUAGE_PATTERN = Regex("[a-z]{3}")
     }
+}
+
+private fun String.toIso6391(): String = when (this) {
+    "rus" -> "ru"
+    "eng" -> "en"
+    "ita" -> "it"
+    else -> take(2)
 }

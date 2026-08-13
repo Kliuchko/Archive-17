@@ -172,6 +172,8 @@ val appModule = module {
         BookDetailsViewModel(
             workId = parameters.get(),
             repository = get(),
+            freeBookRepository = get(),
+            languageSettingsRepository = get(),
         )
     }
 

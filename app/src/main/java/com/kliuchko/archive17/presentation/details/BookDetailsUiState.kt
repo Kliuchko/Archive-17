@@ -1,6 +1,9 @@
 package com.kliuchko.archive17.presentation.details
 
+import com.kliuchko.archive17.domain.model.FreeBook
+import com.kliuchko.archive17.domain.model.PublicationEdition
 import com.kliuchko.archive17.domain.model.ReadingStatus
+import com.kliuchko.archive17.domain.model.TemporaryBook
 import com.kliuchko.archive17.domain.model.Work
 
 data class BookDetailsUiState(
@@ -11,11 +14,23 @@ data class BookDetailsUiState(
     val isRefreshing: Boolean = false,
     val isCached: Boolean = false,
     val isStale: Boolean = false,
+    val editions: List<PublicationEdition> = emptyList(),
+    val freeBooksByEditionId: Map<String, FreeBook> = emptyMap(),
+    val isLoadingEditions: Boolean = false,
+    val downloadingEditionId: String? = null,
+    val readingEditionId: String? = null,
+    val downloadedBookId: String? = null,
+    val temporaryBook: TemporaryBook? = null,
     val message: String? = null,
     val errorMessage: String? = null,
 ) {
     val canSave: Boolean
         get() = work != null && !isRefreshing
+
+    val preferredFreeBook: FreeBook?
+        get() = editions.firstNotNullOfOrNull { edition ->
+            freeBooksByEditionId[edition.id]
+        }
 
     val languageLabel: String
         get() = work?.editionLanguages

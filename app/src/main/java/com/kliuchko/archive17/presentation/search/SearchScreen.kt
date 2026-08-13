@@ -175,6 +175,7 @@ fun SearchScreen(
                 onFreeBookClick = onFreeBookClick,
                 onDownloadBook = viewModel::downloadBook,
                 onReadNow = viewModel::readNow,
+                onAddWorkToShelf = viewModel::addWorkToShelf,
                 onLoadNextPage = viewModel::loadNextPage,
                 onRetryNextPage = viewModel::retryNextPage,
                 modifier = Modifier.fillMaxSize(),
@@ -190,6 +191,7 @@ private fun SearchResults(
     onFreeBookClick: (String) -> Unit,
     onDownloadBook: (FreeBook) -> Unit,
     onReadNow: (FreeBook) -> Unit,
+    onAddWorkToShelf: (Work) -> Unit,
     onLoadNextPage: () -> Unit,
     onRetryNextPage: () -> Unit,
     modifier: Modifier = Modifier,
@@ -279,7 +281,7 @@ private fun SearchResults(
                             isPreparingToRead = uiState.readingBookId == book.editionId,
                             actionsEnabled = uiState.downloadingBookId == null &&
                                 uiState.readingBookId == null,
-                            onOpen = { onFreeBookClick(book.editionId) },
+                            onOpen = { onFreeBookClick(book.workId) },
                             onRead = { onReadNow(book) },
                             onDownload = { onDownloadBook(book) },
                         )
@@ -312,9 +314,9 @@ private fun SearchResults(
                                 isDownloading = false,
                                 isPreparingToRead = false,
                                 actionsEnabled = false,
-                                onOpen = { onFreeBookClick(book.editionId) },
-                                onRead = { onFreeBookClick(book.editionId) },
-                                onDownload = { onFreeBookClick(book.editionId) },
+                                onOpen = { onFreeBookClick(book.workId) },
+                                onRead = { onFreeBookClick(book.workId) },
+                                onDownload = { onFreeBookClick(book.workId) },
                             )
                         }
                     }
@@ -374,7 +376,9 @@ private fun SearchResults(
                     ) { work ->
                         SearchResultCard(
                             work = work,
+                            isSaving = uiState.savingWorkId == work.id,
                             onClick = { onBookClick(work.id) },
+                            onAddToShelf = { onAddWorkToShelf(work) },
                         )
                     }
                     if (uiState.isLoadingNextPage || uiState.nextPageError != null) {
@@ -663,7 +667,9 @@ private fun CatalogLoadingPlaceholder(
 @Composable
 private fun SearchResultCard(
     work: Work,
+    isSaving: Boolean,
     onClick: () -> Unit,
+    onAddToShelf: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Card(
@@ -704,11 +710,26 @@ private fun SearchResultCard(
                     overflow = TextOverflow.Ellipsis,
                 )
             }
-            Text(
-                text = stringResource(R.string.open),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.primary,
-            )
+            Column(
+                horizontalAlignment = Alignment.End,
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                Text(
+                    text = stringResource(R.string.more_details),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+                Button(
+                    onClick = onAddToShelf,
+                    enabled = !isSaving,
+                ) {
+                    Text(
+                        text = stringResource(
+                            if (isSaving) R.string.adding else R.string.download_to_shelf,
+                        ),
+                    )
+                }
+            }
         }
     }
 }

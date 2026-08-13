@@ -26,6 +26,7 @@ data class SearchUiState(
     val bookLanguageCode: String = "eng",
     val downloadingBookId: String? = null,
     val readingBookId: String? = null,
+    val savingWorkId: String? = null,
     val downloadedBookId: String? = null,
     val temporaryBook: TemporaryBook? = null,
     val errorMessage: String? = null,

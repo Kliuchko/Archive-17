@@ -104,8 +104,8 @@ fun Archive17App(
                     onBookClick = { workId ->
                         navController.navigate(Archive17Destination.Details.createRoute(workId))
                     },
-                    onFreeBookClick = { editionId ->
-                        navController.navigate(Archive17Destination.FreeDetails.createRoute(editionId))
+                    onFreeBookClick = { workId ->
+                        navController.navigate(Archive17Destination.Details.createRoute(workId))
                     },
                     onFreeBookReady = { bookId ->
                         navController.navigate(Archive17Destination.LocalDetails.createRoute(bookId))
@@ -159,6 +159,12 @@ fun Archive17App(
                 BookDetailsScreen(
                     workId = workId,
                     onBackClick = navController::popBackStack,
+                    onBookReady = { bookId ->
+                        navController.navigate(Archive17Destination.LocalDetails.createRoute(bookId))
+                    },
+                    onTemporaryBookReady = { book ->
+                        context.startActivity(EpubReaderActivity.createTemporaryIntent(context, book))
+                    },
                 )
             }
 

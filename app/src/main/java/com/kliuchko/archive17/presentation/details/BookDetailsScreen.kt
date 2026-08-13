@@ -14,12 +14,15 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -30,6 +33,10 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.kliuchko.archive17.R
 import com.kliuchko.archive17.data.networking.CoverSize
 import com.kliuchko.archive17.domain.model.ReadingStatus
+import com.kliuchko.archive17.domain.model.EditionAccessMode
+import com.kliuchko.archive17.domain.model.EditionAvailability
+import com.kliuchko.archive17.domain.model.PublicationEdition
+import com.kliuchko.archive17.domain.model.TemporaryBook
 import com.kliuchko.archive17.presentation.components.BookCover
 import com.kliuchko.archive17.presentation.components.localizedDisplayName
 import org.koin.androidx.compose.koinViewModel
@@ -39,10 +46,25 @@ import org.koin.core.parameter.parametersOf
 fun BookDetailsScreen(
     workId: String,
     onBackClick: () -> Unit,
+    onBookReady: (String) -> Unit,
+    onTemporaryBookReady: (TemporaryBook) -> Unit,
     modifier: Modifier = Modifier,
     viewModel: BookDetailsViewModel = koinViewModel(parameters = { parametersOf(workId) }),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+
+    LaunchedEffect(uiState.downloadedBookId) {
+        uiState.downloadedBookId?.let { bookId ->
+            onBookReady(bookId)
+            viewModel.onDownloadedBookHandled()
+        }
+    }
+    LaunchedEffect(uiState.temporaryBook) {
+        uiState.temporaryBook?.let { book ->
+            onTemporaryBookReady(book)
+            viewModel.onTemporaryBookHandled()
+        }
+    }
 
     Column(
         modifier = modifier
@@ -133,15 +155,40 @@ fun BookDetailsScreen(
 
                 StatusIndicators(uiState = uiState)
 
-                OutlinedButton(
-                    onClick = {},
-                    enabled = false,
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Text(text = stringResource(R.string.read_soon))
+                val preferredFreeBook = uiState.preferredFreeBook
+                if (preferredFreeBook != null) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    ) {
+                        OutlinedButton(
+                            onClick = { viewModel.readNow(preferredFreeBook) },
+                            enabled = uiState.readingEditionId == null &&
+                                uiState.downloadingEditionId == null,
+                            modifier = Modifier.weight(1f),
+                        ) {
+                            Text(stringResource(R.string.read_now))
+                        }
+                        Button(
+                            onClick = { viewModel.addEditionToShelf(preferredFreeBook) },
+                            enabled = uiState.readingEditionId == null &&
+                                uiState.downloadingEditionId == null,
+                            modifier = Modifier.weight(1f),
+                        ) {
+                            Text(stringResource(R.string.download_to_shelf))
+                        }
+                    }
+                } else {
+                    OutlinedButton(
+                        onClick = {},
+                        enabled = false,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text(text = stringResource(R.string.purchase_options_soon))
+                    }
                 }
 
-                if (uiState.selectedStatus == null) {
+                if (preferredFreeBook == null && uiState.selectedStatus == null) {
                     Button(
                         onClick = { viewModel.saveStatus(ReadingStatus.WANT_TO_READ) },
                         enabled = uiState.canSave,
@@ -149,7 +196,7 @@ fun BookDetailsScreen(
                     ) {
                         Text(text = stringResource(R.string.place_in_archive))
                     }
-                } else {
+                } else if (uiState.selectedStatus != null) {
                     Text(
                         text = stringResource(R.string.in_archive),
                         modifier = Modifier.fillMaxWidth(),
@@ -157,6 +204,43 @@ fun BookDetailsScreen(
                         color = MaterialTheme.colorScheme.primary,
                         textAlign = TextAlign.Center,
                     )
+                }
+
+                DetailsSection(title = stringResource(R.string.available_editions)) {
+                    Text(
+                        text = stringResource(R.string.available_editions_body),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    work.editionCount?.let { count ->
+                        Text(
+                            text = stringResource(R.string.catalog_editions_found, count),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.primary,
+                        )
+                    }
+                    when {
+                        uiState.isLoadingEditions -> CircularProgressIndicator()
+                        uiState.editions.isEmpty() -> Text(
+                            text = stringResource(R.string.edition_details_pending),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        else -> uiState.editions.forEach { edition ->
+                            WorkEditionCard(
+                                edition = edition,
+                                isFree = edition.id in uiState.freeBooksByEditionId,
+                                isBusy = uiState.readingEditionId != null ||
+                                    uiState.downloadingEditionId != null,
+                                onRead = uiState.freeBooksByEditionId[edition.id]?.let { book ->
+                                    { viewModel.readNow(book) }
+                                },
+                                onAddToShelf = uiState.freeBooksByEditionId[edition.id]?.let { book ->
+                                    { viewModel.addEditionToShelf(book) }
+                                },
+                            )
+                        }
+                    }
                 }
 
                 DetailsSection(title = stringResource(R.string.shelf_status)) {
@@ -211,6 +295,111 @@ fun BookDetailsScreen(
             }
         }
     }
+}
+
+@Composable
+private fun WorkEditionCard(
+    edition: PublicationEdition,
+    isFree: Boolean,
+    isBusy: Boolean,
+    onRead: (() -> Unit)?,
+    onAddToShelf: (() -> Unit)?,
+) {
+    val access = edition.accessOptions.firstOrNull()
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+    ) {
+        Column(
+            modifier = Modifier.padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(5.dp),
+        ) {
+            Text(edition.title, style = MaterialTheme.typography.titleMedium)
+            Text(
+                text = listOfNotNull(
+                    editionLanguageName(edition.languageCode),
+                    edition.publishedYear?.toString(),
+                    edition.translator?.let { stringResource(R.string.edition_translator_value, it) },
+                    edition.publisher,
+                ).joinToString(" · "),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Text(
+                text = if (isFree) {
+                    stringResource(R.string.edition_access_free)
+                } else {
+                    accessLabel(access?.mode, access?.availability)
+                },
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.primary,
+            )
+            access?.providerName?.let { provider ->
+                Text(
+                    text = provider,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            if (onRead != null && onAddToShelf != null) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    OutlinedButton(
+                        onClick = onRead,
+                        enabled = !isBusy,
+                        modifier = Modifier.weight(1f),
+                    ) {
+                        Text(stringResource(R.string.read_now))
+                    }
+                    Button(
+                        onClick = onAddToShelf,
+                        enabled = !isBusy,
+                        modifier = Modifier.weight(1f),
+                    ) {
+                        Text(stringResource(R.string.download_to_shelf))
+                    }
+                }
+            } else {
+                Text(
+                    text = stringResource(R.string.purchase_options_soon),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun editionLanguageName(code: String): String = stringResource(
+    when (code) {
+        "rus" -> R.string.language_russian
+        "eng" -> R.string.language_english
+        "ita" -> R.string.language_italian
+        else -> R.string.language_other
+    },
+)
+
+@Composable
+private fun accessLabel(
+    mode: EditionAccessMode?,
+    availability: EditionAvailability?,
+): String = when (availability) {
+    EditionAvailability.AVAILABLE -> when (mode) {
+        EditionAccessMode.FREE -> stringResource(R.string.edition_access_free)
+        EditionAccessMode.SUBSCRIPTION -> stringResource(R.string.edition_access_subscription)
+        EditionAccessMode.PURCHASE -> stringResource(R.string.edition_access_purchase)
+        EditionAccessMode.PARTNER_PURCHASE -> stringResource(R.string.edition_access_partner)
+        EditionAccessMode.OWNED_FILE -> stringResource(R.string.edition_access_owned_file)
+        else -> stringResource(R.string.edition_access_unavailable)
+    }
+    EditionAvailability.EXTERNAL_ONLY -> stringResource(R.string.edition_access_external)
+    EditionAvailability.REGION_RESTRICTED ->
+        stringResource(R.string.edition_access_region_restricted)
+    EditionAvailability.COMING_SOON -> stringResource(R.string.edition_access_coming_soon)
+    EditionAvailability.UNAVAILABLE, null -> stringResource(R.string.edition_access_unavailable)
 }
 
 @Composable

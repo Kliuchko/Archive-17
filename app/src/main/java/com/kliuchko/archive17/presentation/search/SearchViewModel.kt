@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.kliuchko.archive17.domain.model.BookLanguage
 import com.kliuchko.archive17.domain.model.FreeBook
 import com.kliuchko.archive17.domain.model.TextEditionType
+import com.kliuchko.archive17.domain.model.ReadingStatus
 import com.kliuchko.archive17.domain.model.Work
 import com.kliuchko.archive17.domain.repository.BookRepository
 import com.kliuchko.archive17.domain.repository.FreeBookRepository
@@ -197,6 +198,24 @@ class SearchViewModel(
         _uiState.update { it.copy(temporaryBook = null) }
     }
 
+    fun addWorkToShelf(work: Work) {
+        if (_uiState.value.savingWorkId != null) return
+        viewModelScope.launch {
+            _uiState.update { it.copy(savingWorkId = work.id, actionMessage = null) }
+            when (val result = repository.saveWorkToLibrary(work, ReadingStatus.WANT_TO_READ)) {
+                is RepositoryResult.Success -> _uiState.update {
+                    it.copy(savingWorkId = null, actionMessage = "Книга добавлена на Полку.")
+                }
+                is RepositoryResult.Cached -> _uiState.update {
+                    it.copy(savingWorkId = null, actionMessage = result.message)
+                }
+                is RepositoryResult.Error -> _uiState.update {
+                    it.copy(savingWorkId = null, actionMessage = result.message)
+                }
+            }
+        }
+    }
+
     fun loadNextPage() {
         val request = activeRequest ?: return
         val state = _uiState.value
@@ -356,6 +375,7 @@ class SearchViewModel(
         languageCode: String,
         notice: String? = null,
     ) {
+        cacheFreeCatalogWorks(candidates)
         _uiState.update {
             it.copy(
                 isLoading = it.freeBooks.isEmpty() && candidates.isNotEmpty(),
@@ -444,6 +464,7 @@ class SearchViewModel(
             is RepositoryResult.Cached -> searchResult.data
             is RepositoryResult.Error -> return FreeCatalogPageResult.Error(searchResult.message)
         }
+        cacheFreeCatalogWorks(candidates)
         val classified = when (
             val availability = freeBookRepository.keepDownloadableBooks(candidates, languageCode)
         ) {
@@ -696,4 +717,26 @@ class SearchViewModel(
         .mapValues { (_, editions) -> editions.distinctBy(FreeBook::editionId).size }
 
     private fun Int?.orEmptyCount(): Int = this ?: 0
+
+    private suspend fun cacheFreeCatalogWorks(books: List<FreeBook>) {
+        val works = books
+            .filter { book -> book.workId.isNotBlank() }
+            .groupBy(FreeBook::workId)
+            .map { (workId, editions) ->
+                val representative = editions.first()
+                Work(
+                    id = workId,
+                    title = representative.title,
+                    authors = representative.authors,
+                    coverId = representative.coverId,
+                    firstPublishYear = representative.firstPublishYear,
+                    editionCount = editions.distinctBy(FreeBook::editionId).size,
+                    editionLanguages = editions.map(FreeBook::languageCode).distinct(),
+                    description = null,
+                    subjects = emptyList(),
+                    lastUpdatedAt = null,
+                )
+            }
+        if (works.isNotEmpty()) repository.cacheCatalogWorks(works)
+    }
 }
