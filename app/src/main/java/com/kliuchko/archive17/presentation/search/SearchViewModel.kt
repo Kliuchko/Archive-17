@@ -255,6 +255,7 @@ class SearchViewModel(
                     request = SearchRequest(query, CatalogMode.FREE, languageCode),
                     canLoadMore = result.data.isNotEmpty(),
                 )
+                if (query.isBlank()) refreshStarterFreeBooks(result.data, languageCode)
             }
             is RepositoryResult.Cached -> {
                 showFreeBookCandidates(result.data, languageCode, result.message)
@@ -262,9 +263,27 @@ class SearchViewModel(
                     request = SearchRequest(query, CatalogMode.FREE, languageCode),
                     canLoadMore = result.data.isNotEmpty(),
                 )
+                if (query.isBlank()) refreshStarterFreeBooks(result.data, languageCode)
             }
             is RepositoryResult.Error -> showSearchError(result.message)
         }
+    }
+
+    private suspend fun refreshStarterFreeBooks(
+        initialBooks: List<FreeBook>,
+        languageCode: String,
+    ) {
+        val refreshed = when (val result = freeBookRepository.refreshStarterCatalog(languageCode)) {
+            is RepositoryResult.Success -> result.data
+            is RepositoryResult.Cached -> result.data
+            is RepositoryResult.Error -> return
+        }
+        if (refreshed.map(FreeBook::editionId) == initialBooks.map(FreeBook::editionId)) return
+        showFreeBookCandidates(refreshed, languageCode)
+        activatePagination(
+            request = SearchRequest("", CatalogMode.FREE, languageCode),
+            canLoadMore = refreshed.isNotEmpty(),
+        )
     }
 
     private suspend fun showFreeBookCandidates(

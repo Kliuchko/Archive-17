@@ -12,6 +12,11 @@ interface FreeBookRepository {
         page: Int = 1,
     ): RepositoryResult<List<FreeBook>>
 
+    suspend fun refreshStarterCatalog(
+        languageCode: String,
+        page: Int = 1,
+    ): RepositoryResult<List<FreeBook>>
+
     suspend fun keepDownloadableBooks(
         books: List<FreeBook>,
         languageCode: String,

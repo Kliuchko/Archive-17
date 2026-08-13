@@ -26,6 +26,7 @@ data class FreeBook(
             FreeBookSource.OPEN_LIBRARY -> "Open Library · Internet Archive"
             FreeBookSource.WIKISOURCE -> "Викитека · Wikimedia"
             FreeBookSource.STANDARD_EBOOKS -> "Standard Ebooks"
+            FreeBookSource.AUTHORIZED_PUBLISHER -> "Официальный сайт книги"
         }
 
     val sourceUrl: String
@@ -39,6 +40,7 @@ data class FreeBook(
                 "https://ru.wikisource.org/wiki/$page"
             }
             FreeBookSource.STANDARD_EBOOKS -> sourcePageUrl.orEmpty()
+            FreeBookSource.AUTHORIZED_PUBLISHER -> sourcePageUrl.orEmpty()
         }
 
     val isDownloadable: Boolean
@@ -61,6 +63,7 @@ enum class FreeBookSource {
     OPEN_LIBRARY,
     WIKISOURCE,
     STANDARD_EBOOKS,
+    AUTHORIZED_PUBLISHER,
 }
 
 private val NON_TITLE_CHARACTER_PATTERN = Regex("[^\\p{L}\\p{N}]+")

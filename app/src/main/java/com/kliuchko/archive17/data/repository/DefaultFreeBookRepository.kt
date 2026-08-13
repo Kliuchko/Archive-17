@@ -6,6 +6,9 @@ import com.kliuchko.archive17.data.networking.api.OpenLibraryApi
 import com.kliuchko.archive17.data.networking.api.WikisourceApi
 import com.kliuchko.archive17.data.networking.dto.InternetArchiveFileDto
 import com.kliuchko.archive17.data.networking.mapper.curatedEnglishStandardEbooks
+import com.kliuchko.archive17.data.networking.mapper.curatedAuthorizedRussianBooks
+import com.kliuchko.archive17.data.networking.mapper.authorizedPublisherDetails
+import com.kliuchko.archive17.data.networking.mapper.isTrustedAuthorizedPublisherEpub
 import com.kliuchko.archive17.data.networking.mapper.curatedRussianWikisourceBooks
 import com.kliuchko.archive17.data.networking.mapper.standardEbookDetails
 import com.kliuchko.archive17.data.networking.mapper.toFreeBooks
@@ -25,13 +28,10 @@ import java.io.InputStream
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
@@ -53,8 +53,6 @@ class DefaultFreeBookRepository(
     )
     private val booksByEditionId = ConcurrentHashMap<String, FreeBook>()
     private val catalogCache = FreeBookCatalogCache(context)
-    private val catalogRefreshScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-    private val refreshingCatalogPages = ConcurrentHashMap.newKeySet<String>()
 
     override suspend fun searchBooks(
         query: String,
@@ -85,19 +83,23 @@ class DefaultFreeBookRepository(
                 remoteBooks.forEach { book -> booksByEditionId[book.editionId] = book }
                 return RepositoryResult.Success(remoteBooks)
             }
-            refreshStarterCatalog(languageCode, page)
             val books = interleaveBooks(primarySourceBooks, cachedBooks)
                 .distinctBy(FreeBook::catalogTitleKey)
             books.forEach { book -> booksByEditionId[book.editionId] = book }
             return RepositoryResult.Success(books)
         }
 
-        val (openLibraryBooks, openLibraryError) = fetchBooksSafely {
-            fetchOpenLibraryBooks(normalizedQuery, languageCode, page)
+        val (openLibraryResult, primarySourceResult) = coroutineScope {
+            val openLibrary = async {
+                fetchBooksSafely { fetchOpenLibraryBooks(normalizedQuery, languageCode, page) }
+            }
+            val primarySource = async {
+                fetchBooksSafely { searchPrimarySourceBooks(normalizedQuery, languageCode, page) }
+            }
+            openLibrary.await() to primarySource.await()
         }
-        val (primarySourceBooks, primarySourceError) = fetchBooksSafely {
-            searchPrimarySourceBooks(normalizedQuery, languageCode, page)
-        }
+        val (openLibraryBooks, openLibraryError) = openLibraryResult
+        val (primarySourceBooks, primarySourceError) = primarySourceResult
 
         return if (openLibraryError != null && primarySourceError != null) {
             RepositoryResult.Error("Не удалось найти бесплатные книги.")
@@ -106,6 +108,42 @@ class DefaultFreeBookRepository(
                 .distinctBy(FreeBook::catalogTitleKey)
             books.forEach { book -> booksByEditionId[book.editionId] = book }
             RepositoryResult.Success(books)
+        }
+    }
+
+    override suspend fun refreshStarterCatalog(
+        languageCode: String,
+        page: Int,
+    ): RepositoryResult<List<FreeBook>> {
+        if (!languageCode.matches(ISO_639_2_PATTERN)) {
+            return RepositoryResult.Error("Не удалось определить язык бесплатных книг.")
+        }
+        val safePage = page.coerceAtLeast(1)
+        val primary = runCatching {
+            searchPrimarySourceBooks("", languageCode, safePage)
+        }.getOrDefault(emptyList())
+        val cached = catalogCache.read(languageCode, safePage)
+        if (
+            cached.isNotEmpty() &&
+            !catalogCache.shouldRefresh(languageCode, safePage, System.currentTimeMillis())
+        ) {
+            val books = interleaveBooks(primary, cached).distinctBy(FreeBook::catalogTitleKey)
+            books.forEach { book -> booksByEditionId[book.editionId] = book }
+            return RepositoryResult.Success(books)
+        }
+        return try {
+            val remote = fetchOpenLibraryBooks("", languageCode, safePage)
+            catalogCache.write(languageCode, safePage, remote, System.currentTimeMillis())
+            val books = interleaveBooks(primary, remote).distinctBy(FreeBook::catalogTitleKey)
+            books.forEach { book -> booksByEditionId[book.editionId] = book }
+            RepositoryResult.Success(books)
+        } catch (exception: Throwable) {
+            if (exception is CancellationException) throw exception
+            if (primary.isNotEmpty()) {
+                RepositoryResult.Cached(primary, "Сетевой каталог пока не обновился.")
+            } else {
+                RepositoryResult.Error("Не удалось обновить бесплатный каталог.")
+            }
         }
     }
 
@@ -126,6 +164,13 @@ class DefaultFreeBookRepository(
         }
         if (book.source == FreeBookSource.STANDARD_EBOOKS) {
             return standardEbookDetails(book)
+                ?.let { RepositoryResult.Success(it) }
+                ?: RepositoryResult.Success(
+                    FreeBookDetails(book = book, description = null, subjects = emptyList()),
+                )
+        }
+        if (book.source == FreeBookSource.AUTHORIZED_PUBLISHER) {
+            return authorizedPublisherDetails(book)
                 ?.let { RepositoryResult.Success(it) }
                 ?: RepositoryResult.Success(
                     FreeBookDetails(book = book, description = null, subjects = emptyList()),
@@ -308,7 +353,7 @@ class DefaultFreeBookRepository(
     ): RepositoryResult<File> {
         val downloadUrl = book.epubDownloadUrl
             ?.toHttpUrlOrNull()
-            ?.takeIf { url -> book.isTrustedDirectDownload(url.host, url.encodedPath) }
+            ?.takeIf { url -> book.isTrustedDirectDownload(url) }
             ?: book.epubFileName?.let { fileName ->
                 "https://archive.org".toHttpUrl().newBuilder()
                     .addPathSegment("download")
@@ -373,7 +418,10 @@ class DefaultFreeBookRepository(
         languageCode: String,
         page: Int,
     ): List<FreeBook> = when (languageCode) {
-        RUSSIAN_LANGUAGE -> searchWikisourceBooks(query, page)
+        RUSSIAN_LANGUAGE -> interleaveBooks(
+            curatedAuthorizedRussianBooks(query, page),
+            searchWikisourceBooks(query, page),
+        )
         ENGLISH_LANGUAGE -> curatedEnglishStandardEbooks(query, page)
         else -> emptyList()
     }
@@ -392,24 +440,6 @@ class DefaultFreeBookRepository(
         ).toFreeBooks(expectedLanguageCode = languageCode)
     }
 
-    private fun refreshStarterCatalog(languageCode: String, page: Int) {
-        val safePage = page.coerceAtLeast(1)
-        if (!catalogCache.shouldRefresh(languageCode, safePage, System.currentTimeMillis())) return
-        val refreshKey = "$languageCode:$safePage"
-        if (!refreshingCatalogPages.add(refreshKey)) return
-
-        catalogRefreshScope.launch {
-            try {
-                val books = fetchOpenLibraryBooks("", languageCode, safePage)
-                catalogCache.write(languageCode, safePage, books, System.currentTimeMillis())
-            } catch (exception: Throwable) {
-                if (exception is CancellationException) throw exception
-            } finally {
-                refreshingCatalogPages.remove(refreshKey)
-            }
-        }
-    }
-
     private suspend fun searchWikisourceBooks(
         query: String,
         page: Int,
@@ -424,13 +454,16 @@ class DefaultFreeBookRepository(
         ).toFreeBooks(RUSSIAN_LANGUAGE)
     }
 
-    private fun FreeBook.isTrustedDirectDownload(host: String, path: String): Boolean =
+    private fun FreeBook.isTrustedDirectDownload(url: okhttp3.HttpUrl): Boolean =
+        url.isHttps &&
         when (source) {
-            FreeBookSource.WIKISOURCE -> host == WS_EXPORT_HOST
+            FreeBookSource.WIKISOURCE -> url.host == WS_EXPORT_HOST
             FreeBookSource.STANDARD_EBOOKS ->
-                host == STANDARD_EBOOKS_HOST &&
-                    path.startsWith("/ebooks/") &&
-                    path.endsWith(".epub")
+                url.host == STANDARD_EBOOKS_HOST &&
+                    url.encodedPath.startsWith("/ebooks/") &&
+                    url.encodedPath.endsWith(".epub")
+            FreeBookSource.AUTHORIZED_PUBLISHER ->
+                isTrustedAuthorizedPublisherEpub(url)
             FreeBookSource.OPEN_LIBRARY -> false
         }
 

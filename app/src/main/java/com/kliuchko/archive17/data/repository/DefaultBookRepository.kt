@@ -7,6 +7,7 @@ import com.kliuchko.archive17.data.local.mapper.toDomain
 import com.kliuchko.archive17.data.local.mapper.toEntity
 import com.kliuchko.archive17.data.networking.api.OpenLibraryApi
 import com.kliuchko.archive17.data.networking.mapper.toDomain
+import com.kliuchko.archive17.data.networking.mapper.withCatalogQueryAlias
 import com.kliuchko.archive17.domain.model.LibraryBook
 import com.kliuchko.archive17.domain.model.LibraryEntry
 import com.kliuchko.archive17.domain.model.ReadingStatus
@@ -36,7 +37,10 @@ class DefaultBookRepository(
             errorMessage = "Unable to search books.",
         ) {
             val now = timeProvider.currentTimeMillis()
-            val works = api.searchBooks(normalizedQuery, page = page.coerceAtLeast(1))
+            val works = api.searchBooks(
+                normalizedQuery.withCatalogQueryAlias(),
+                page = page.coerceAtLeast(1),
+            )
                 .toDomain()
                 .map { it.copy(lastUpdatedAt = now) }
 
