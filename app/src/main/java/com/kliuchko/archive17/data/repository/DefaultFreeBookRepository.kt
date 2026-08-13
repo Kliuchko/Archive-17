@@ -68,6 +68,7 @@ class DefaultFreeBookRepository(
         query: String,
         languageCode: String,
         page: Int,
+        resolveAliases: Boolean,
     ): RepositoryResult<List<FreeBook>> {
         val normalizedQuery = query.trim()
         if (normalizedQuery.isNotEmpty() && normalizedQuery.length < MIN_SEARCH_QUERY_LENGTH) {
@@ -99,9 +100,13 @@ class DefaultFreeBookRepository(
             return RepositoryResult.Success(books)
         }
 
-        val resolvedQueries = queryResolver.resolve(normalizedQuery, languageCode)
-            .ifEmpty { listOf(normalizedQuery) }
-            .take(MAX_SOURCE_QUERIES)
+        val resolvedQueries = if (resolveAliases) {
+            queryResolver.resolve(normalizedQuery, languageCode)
+                .ifEmpty { listOf(normalizedQuery) }
+                .take(MAX_SOURCE_QUERIES)
+        } else {
+            listOf(normalizedQuery)
+        }
         val englishAlternativeQuery = if (languageCode != ENGLISH_LANGUAGE && page == 1) {
             resolvedQueries.firstOrNull { query -> query.containsLatinLetters() }
         } else {
@@ -361,6 +366,9 @@ class DefaultFreeBookRepository(
 
     override suspend fun downloadToShelf(book: FreeBook): RepositoryResult<LocalBook> =
         withContext(Dispatchers.IO) {
+            localBookRepository.getLocalBookByIdentifier(book.editionId)
+                ?.takeIf { saved -> File(saved.filePath).hasEpubSignature() }
+                ?.let { saved -> return@withContext RepositoryResult.Success(saved) }
             downloadDirectory.mkdirs()
             val temporaryFile = File(downloadDirectory, "${UUID.randomUUID()}.epub")
             try {

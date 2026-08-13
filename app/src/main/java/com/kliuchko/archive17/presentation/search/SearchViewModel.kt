@@ -298,7 +298,17 @@ class SearchViewModel(
     }
 
     private suspend fun searchFreeBooks(query: String, languageCode: String) {
-        when (val result = freeBookRepository.searchBooks(query, languageCode)) {
+        val fastResult = freeBookRepository.searchBooks(
+            query = query,
+            languageCode = languageCode,
+            resolveAliases = false,
+        )
+        val result = if (query.isNotBlank() && fastResult.listData().isEmpty()) {
+            freeBookRepository.searchBooks(query, languageCode, resolveAliases = true)
+        } else {
+            fastResult
+        }
+        when (result) {
             is RepositoryResult.Success -> {
                 showFreeBookCandidates(result.data, languageCode)
                 activatePagination(
@@ -502,10 +512,27 @@ class SearchViewModel(
 
     private suspend fun searchAllBooks(request: SearchRequest) {
         val effectiveQuery = request.query.ifBlank { STARTER_ALL_BOOKS_QUERY }
-        val result = repository.searchBooks(effectiveQuery, page = 1)
+        val cachedBooks = if (request.query.isNotBlank()) {
+            repository.searchCachedBooks(request.query)
+        } else {
+            emptyList()
+        }
+        if (cachedBooks.isNotEmpty()) {
+            showAllBooks(cachedBooks, isRefreshing = true)
+        }
+        val fastResult = repository.searchBooks(
+            query = effectiveQuery,
+            page = 1,
+            resolveAliases = false,
+        )
+        val result = if (request.query.isNotBlank() && fastResult.listData().isEmpty()) {
+            repository.searchBooks(effectiveQuery, page = 1, resolveAliases = true)
+        } else {
+            fastResult
+        }
         when (result) {
             is RepositoryResult.Success -> {
-                showAllBooks(result.data)
+                showAllBooks((cachedBooks + result.data).distinctBy(Work::id))
                 activatePagination(
                     request = request.copy(query = effectiveQuery),
                     canLoadMore = result.data.isNotEmpty(),
@@ -513,7 +540,10 @@ class SearchViewModel(
             }
 
             is RepositoryResult.Cached -> {
-                showAllBooks(result.data, result.message)
+                showAllBooks(
+                    books = (cachedBooks + result.data).distinctBy(Work::id),
+                    notice = result.message,
+                )
                 activatePagination(
                     request = request.copy(query = effectiveQuery),
                     canLoadMore = result.data.isNotEmpty(),
@@ -526,10 +556,14 @@ class SearchViewModel(
         }
     }
 
-    private fun showAllBooks(books: List<Work>, notice: String? = null) {
+    private fun showAllBooks(
+        books: List<Work>,
+        notice: String? = null,
+        isRefreshing: Boolean = false,
+    ) {
         _uiState.update {
             it.copy(
-                isLoading = false,
+                isLoading = isRefreshing,
                 isCheckingFreeBooks = false,
                 isLoadingNextPage = false,
                 books = books,
@@ -717,6 +751,12 @@ class SearchViewModel(
         .mapValues { (_, editions) -> editions.distinctBy(FreeBook::editionId).size }
 
     private fun Int?.orEmptyCount(): Int = this ?: 0
+
+    private fun <T> RepositoryResult<List<T>>.listData(): List<T> = when (this) {
+        is RepositoryResult.Success -> data
+        is RepositoryResult.Cached -> data
+        is RepositoryResult.Error -> emptyList()
+    }
 
     private suspend fun cacheFreeCatalogWorks(books: List<FreeBook>) {
         val works = books

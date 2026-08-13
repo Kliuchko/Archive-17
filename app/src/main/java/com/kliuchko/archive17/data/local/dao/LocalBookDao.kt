@@ -27,6 +27,9 @@ interface LocalBookDao {
     @Query("SELECT * FROM local_books WHERE contentHash = :contentHash LIMIT 1")
     suspend fun getLocalBookByContentHash(contentHash: String): LocalBookEntity?
 
+    @Query("SELECT * FROM local_books WHERE identifier = :identifier LIMIT 1")
+    suspend fun getLocalBookByIdentifier(identifier: String): LocalBookEntity?
+
     @Query("SELECT * FROM local_books WHERE contentHash IS NULL")
     suspend fun getLocalBooksWithoutContentHash(): List<LocalBookEntity>
 

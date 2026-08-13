@@ -179,6 +179,9 @@ fun Archive17App(
                         }
                     },
                     onLocalBookClick = { bookId ->
+                        context.startActivity(EpubReaderActivity.createIntent(context, bookId))
+                    },
+                    onLocalBookDetailsClick = { bookId ->
                         navController.navigate(Archive17Destination.LocalDetails.createRoute(bookId))
                     },
                 )

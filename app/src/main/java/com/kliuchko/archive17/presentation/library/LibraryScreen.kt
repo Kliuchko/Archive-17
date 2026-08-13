@@ -47,6 +47,7 @@ import org.koin.androidx.compose.koinViewModel
 fun LibraryScreen(
     onBookClick: (String) -> Unit,
     onLocalBookClick: (String) -> Unit,
+    onLocalBookDetailsClick: (String) -> Unit,
     onCatalogClick: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: LibraryViewModel = koinViewModel(),
@@ -141,6 +142,7 @@ fun LibraryScreen(
                             ShelfLocalBook(
                                 book = book,
                                 onClick = { onLocalBookClick(book.id) },
+                                onDetailsClick = { onLocalBookDetailsClick(book.id) },
                             )
                         }
                         items(
@@ -200,6 +202,7 @@ private fun ShelfBook(
 private fun ShelfLocalBook(
     book: LocalBook,
     onClick: () -> Unit,
+    onDetailsClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -222,6 +225,12 @@ private fun ShelfLocalBook(
             text = book.readingStatus.localizedDisplayName(),
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.primary,
+        )
+        Text(
+            text = stringResource(R.string.book_information),
+            modifier = Modifier.clickable(onClick = onDetailsClick),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
 }

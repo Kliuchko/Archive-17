@@ -12,6 +12,8 @@ interface LocalBookRepository {
 
     suspend fun getLocalBook(id: String): LocalBook?
 
+    suspend fun getLocalBookByIdentifier(identifier: String): LocalBook?
+
     suspend fun importBook(sourceUri: String): RepositoryResult<LocalBook>
 
     suspend fun importDownloadedBook(

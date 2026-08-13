@@ -8,7 +8,13 @@ import com.kliuchko.archive17.domain.model.WorkDetails
 import kotlinx.coroutines.flow.Flow
 
 interface BookRepository {
-    suspend fun searchBooks(query: String, page: Int = 1): RepositoryResult<List<Work>>
+    suspend fun searchBooks(
+        query: String,
+        page: Int = 1,
+        resolveAliases: Boolean = true,
+    ): RepositoryResult<List<Work>>
+
+    suspend fun searchCachedBooks(query: String, limit: Int = 20): List<Work>
 
     suspend fun cacheCatalogWorks(works: List<Work>): RepositoryResult<Unit>
 

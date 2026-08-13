@@ -14,6 +14,9 @@ interface WorkDao {
     @Query("SELECT * FROM works WHERE id = :workId")
     suspend fun getWork(workId: String): WorkEntity?
 
+    @Query("SELECT * FROM works ORDER BY lastUpdatedAt DESC LIMIT :limit")
+    suspend fun getRecentWorks(limit: Int): List<WorkEntity>
+
     @Upsert
     suspend fun upsertWork(work: WorkEntity)
 

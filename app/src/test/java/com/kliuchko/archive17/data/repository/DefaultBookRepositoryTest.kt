@@ -302,6 +302,10 @@ private class FakeWorkDao : WorkDao {
 
     override suspend fun getWork(workId: String): WorkEntity? = getStored(workId)
 
+    override suspend fun getRecentWorks(limit: Int): List<WorkEntity> = works.values
+        .sortedByDescending(WorkEntity::lastUpdatedAt)
+        .take(limit)
+
     override suspend fun upsertWork(work: WorkEntity) {
         works[work.id] = work
         flowFor(work.id).value = work

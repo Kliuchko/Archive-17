@@ -11,6 +11,7 @@ interface FreeBookRepository {
         query: String,
         languageCode: String,
         page: Int = 1,
+        resolveAliases: Boolean = true,
     ): RepositoryResult<List<FreeBook>>
 
     suspend fun refreshStarterCatalog(

@@ -3,6 +3,7 @@ package com.kliuchko.archive17.data.repository
 import com.kliuchko.archive17.core.time.TimeProvider
 import com.kliuchko.archive17.data.local.dao.LibraryEntryDao
 import com.kliuchko.archive17.data.local.dao.WorkDao
+import com.kliuchko.archive17.data.local.entity.WorkEntity
 import com.kliuchko.archive17.data.local.mapper.toDomain
 import com.kliuchko.archive17.data.local.mapper.toEntity
 import com.kliuchko.archive17.data.networking.api.OpenLibraryApi
@@ -25,6 +26,8 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
+import java.text.Normalizer
+import java.util.Locale
 
 class DefaultBookRepository(
     private val api: OpenLibraryApi,
@@ -36,7 +39,11 @@ class DefaultBookRepository(
 ) : BookRepository {
     private val coverMatchEnricher = CoverMatchEnricher()
 
-    override suspend fun searchBooks(query: String, page: Int): RepositoryResult<List<Work>> {
+    override suspend fun searchBooks(
+        query: String,
+        page: Int,
+        resolveAliases: Boolean,
+    ): RepositoryResult<List<Work>> {
         val normalizedQuery = query.trim()
         if (normalizedQuery.length < MIN_SEARCH_QUERY_LENGTH) {
             return RepositoryResult.Success(emptyList())
@@ -46,9 +53,13 @@ class DefaultBookRepository(
             errorMessage = "Unable to search books.",
         ) {
             val now = timeProvider.currentTimeMillis()
-            val resolvedQueries = queryResolver.resolve(normalizedQuery)
-                .ifEmpty { listOf(normalizedQuery) }
-                .take(MAX_SOURCE_QUERIES)
+            val resolvedQueries = if (resolveAliases) {
+                queryResolver.resolve(normalizedQuery)
+                    .ifEmpty { listOf(normalizedQuery) }
+                    .take(MAX_SOURCE_QUERIES)
+            } else {
+                listOf(normalizedQuery)
+            }
             val responses = coroutineScope {
                 resolvedQueries.map { resolvedQuery ->
                     async {
@@ -77,6 +88,20 @@ class DefaultBookRepository(
             workDao.upsertWorks(works.map { it.toEntity(now) })
             RepositoryResult.Success(works)
         }
+    }
+
+    override suspend fun searchCachedBooks(query: String, limit: Int): List<Work> {
+        val key = query.toCatalogSearchKey()
+        if (key.length < MIN_SEARCH_QUERY_LENGTH) return emptyList()
+        return workDao.getRecentWorks(CACHED_SEARCH_SCAN_LIMIT)
+            .asSequence()
+            .map(WorkEntity::toDomain)
+            .filter { work ->
+                work.title.toCatalogSearchKey().contains(key) ||
+                    work.authors.any { author -> author.toCatalogSearchKey().contains(key) }
+            }
+            .take(limit.coerceIn(1, CACHED_SEARCH_RESULT_LIMIT))
+            .toList()
     }
 
     override suspend fun cacheCatalogWorks(works: List<Work>): RepositoryResult<Unit> =
@@ -232,11 +257,20 @@ class DefaultBookRepository(
         const val MIN_SEARCH_QUERY_LENGTH = 2
         const val MAX_SOURCE_QUERIES = 3
         const val DEFAULT_CACHE_FRESHNESS_MILLIS = 24L * 60L * 60L * 1000L
+        private const val CACHED_SEARCH_SCAN_LIMIT = 200
+        private const val CACHED_SEARCH_RESULT_LIMIT = 50
         private const val ENGLISH_EDITION_LANGUAGE = "eng"
         private const val RUSSIAN_EDITION_LANGUAGE = "rus"
         private val EDITION_LANGUAGE_PATTERN = Regex("[a-z]{3}")
     }
 }
+
+private fun String.toCatalogSearchKey(): String = Normalizer
+    .normalize(this, Normalizer.Form.NFKD)
+    .lowercase(Locale.ROOT)
+    .replace(Regex("\\p{M}+"), "")
+    .replace('ё', 'е')
+    .replace(Regex("[^\\p{L}\\p{N}]+"), "")
 
 private fun String.toIso6391(): String = when (this) {
     "rus" -> "ru"

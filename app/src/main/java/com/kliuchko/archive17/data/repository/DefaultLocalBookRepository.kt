@@ -45,6 +45,9 @@ class DefaultLocalBookRepository(
     override suspend fun getLocalBook(id: String): LocalBook? =
         localBookDao.getLocalBook(id)?.toDomain()
 
+    override suspend fun getLocalBookByIdentifier(identifier: String): LocalBook? =
+        localBookDao.getLocalBookByIdentifier(identifier)?.toDomain()
+
     override suspend fun importBook(sourceUri: String): RepositoryResult<LocalBook> =
         withContext(Dispatchers.IO) {
             val uri = Uri.parse(sourceUri)
